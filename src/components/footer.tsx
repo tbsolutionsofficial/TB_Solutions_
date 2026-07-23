@@ -9,19 +9,12 @@ export function Footer() {
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Link to="/" className="flex items-center gap-3">
-              <img
-                src={logoAsset}
-                alt="TB_Solutions"
-                className="h-12 w-auto object-contain"
-              />
-              <span className="font-display text-xl font-bold text-foreground">
-                TB_Solutions
-              </span>
+              <img src={logoAsset} alt="TB_Solutions" className="h-12 w-auto object-contain" />
+              <span className="font-display text-xl font-bold text-foreground">TB_Solutions</span>
             </Link>
             <p className="mt-4 max-w-md text-base leading-relaxed text-muted-foreground">
-              Guiding ideas, empowering impact. Your project consultancy partner
-              for AI, automation, software, robotics, IoT, and digital
-              transformation.
+              Guiding ideas, empowering impact. Your project consultancy partner for AI, automation,
+              software, robotics, IoT, and digital transformation.
             </p>
             <div className="mt-6 flex gap-3">
               <a
@@ -91,9 +84,7 @@ export function Footer() {
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} TB_Solutions. All rights reserved.
           </p>
-          <p className="text-sm text-muted-foreground">
-            Guiding Ideas. Empowering Impact.
-          </p>
+          <p className="text-sm text-muted-foreground">Guiding Ideas. Empowering Impact.</p>
         </div>
       </div>
     </footer>

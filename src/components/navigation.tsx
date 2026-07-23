@@ -29,7 +29,7 @@ export function Navigation() {
           if (e.isIntersecting) setActive("#" + e.target.id);
         });
       },
-      { rootMargin: "-45% 0px -50% 0px" }
+      { rootMargin: "-45% 0px -50% 0px" },
     );
     ids.forEach((id) => {
       const el = document.getElementById(id);
@@ -55,12 +55,15 @@ export function Navigation() {
         >
           <div
             className={`flex items-center justify-between rounded-full transition-all duration-500 ${
-              scrolled
-                ? "glass-strong shadow-xl shadow-espresso/10 px-3 py-2"
-                : "glass px-4 py-2.5"
+              scrolled ? "glass-strong shadow-xl shadow-espresso/10 px-3 py-2" : "glass px-4 py-2.5"
             }`}
           >
-            <Link to="/" className="flex items-center" data-cursor="link" aria-label="TB_Solutions home">
+            <Link
+              to="/"
+              className="flex items-center"
+              data-cursor="link"
+              aria-label="TB_Solutions home"
+            >
               <img
                 src={logoAsset}
                 alt="TB_Solutions"

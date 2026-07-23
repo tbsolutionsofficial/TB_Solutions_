@@ -560,12 +560,7 @@ function Index() {
                 </div>
               </div>
               <div className="mt-8 flex items-center gap-4">
-                <img
-                  src={logoAsset}
-                  alt=""
-                  aria-hidden
-                  className="h-10 w-auto object-contain"
-                />
+                <img src={logoAsset} alt="" aria-hidden className="h-10 w-auto object-contain" />
                 <p className="text-sm text-muted-foreground">Guiding Ideas. Empowering Impact.</p>
               </div>
               <div className="mt-6 flex gap-3 text-sm">

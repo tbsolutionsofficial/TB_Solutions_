@@ -30,6 +30,7 @@ export interface Project {
     demo?: string;
     docs?: string;
     figma?: string;
+    extraLinks?: { label: string; url: string }[];
   };
   seo: { title: string; description: string; keywords: string[] };
 }
