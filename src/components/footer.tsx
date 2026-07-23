@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Mail, Phone, MapPin, Linkedin, Twitter } from "lucide-react";
-import logoAsset from "@/assets/tb-solutions-logo.png.asset.json";
+import logoAsset from "@/assets/tb-solutions-logo.png";
 
 export function Footer() {
   return (
@@ -10,7 +10,7 @@ export function Footer() {
           <div>
             <Link to="/" className="flex items-center gap-3">
               <img
-                src={logoAsset.url}
+                src={logoAsset}
                 alt="TB_Solutions"
                 className="h-12 w-auto object-contain"
               />

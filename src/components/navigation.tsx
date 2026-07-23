@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
-import logoAsset from "@/assets/tb-solutions-logo.png.asset.json";
+import logoAsset from "@/assets/tb-solutions-logo.png";
 import { siteConfig } from "@/content/site";
 
 const navLinks = siteConfig.nav;
@@ -62,7 +62,7 @@ export function Navigation() {
           >
             <Link to="/" className="flex items-center" data-cursor="link" aria-label="TB_Solutions home">
               <img
-                src={logoAsset.url}
+                src={logoAsset}
                 alt="TB_Solutions"
                 className={`w-auto object-contain transition-all duration-500 ${
                   scrolled ? "h-11" : "h-14"
@@ -131,7 +131,7 @@ export function Navigation() {
             <div className="flex h-full flex-col p-6">
               <div className="flex items-center justify-between">
                 <Link to="/" onClick={() => setMobileOpen(false)}>
-                  <img src={logoAsset.url} alt="TB_Solutions" className="h-12 w-auto object-contain" />
+                  <img src={logoAsset} alt="TB_Solutions" className="h-12 w-auto object-contain" />
                 </Link>
                 <button
                   onClick={() => setMobileOpen(false)}

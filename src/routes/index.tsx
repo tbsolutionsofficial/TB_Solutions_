@@ -27,7 +27,7 @@ import { GallerySection } from "@/components/sections/gallery-section";
 import { TestimonialsSection } from "@/components/sections/testimonials-section";
 import { ContactFormMagic } from "@/components/contact-form-magic";
 import { MagneticButton } from "@/components/magnetic-button";
-import logoAsset from "@/assets/tb-solutions-logo.png.asset.json";
+import logoAsset from "@/assets/tb-solutions-logo.png";
 import heroRobot from "@/assets/hero-robot.png";
 import roboticHand from "@/assets/robotic-hand-torch.png";
 import drone from "@/assets/drone.png";
@@ -561,7 +561,7 @@ function Index() {
               </div>
               <div className="mt-8 flex items-center gap-4">
                 <img
-                  src={logoAsset.url}
+                  src={logoAsset}
                   alt=""
                   aria-hidden
                   className="h-10 w-auto object-contain"
