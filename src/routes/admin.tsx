@@ -182,7 +182,11 @@ function AdminPage() {
   const handleSaveHomeContent = async (data: HomeContent) => {
     setSavingHomeContent(true);
     try {
-      await upsertDocById(COLLECTIONS.settings, HOME_CONTENT_DOC_ID, data as Record<string, unknown>);
+      await upsertDocById(
+        COLLECTIONS.settings,
+        HOME_CONTENT_DOC_ID,
+        data as Record<string, unknown>,
+      );
       await queryClient.invalidateQueries({ queryKey: ["firestore", COLLECTIONS.settings] });
       toast.success("Homepage content saved.");
     } catch (err) {
@@ -214,48 +218,6 @@ function AdminPage() {
       setSeeding(false);
     }
   };
-
-  // Auto-seed each collection independently, once, only when a REAL Firestore fetch
-  // (dataUpdatedAt > 0, i.e. past the initialData fallback) confirms it's genuinely
-  // empty — never touches a collection that already has content, so it can't clobber
-  // admin edits.
-  const autoSeededRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const asRecord = (v: unknown) => v as Record<string, unknown>;
-    const maybeSeed = (
-      key: string,
-      query: { isLoading: boolean; dataUpdatedAt: number; data?: unknown[] },
-      items: () => Promise<unknown>[],
-    ) => {
-      if (autoSeededRef.current.has(key)) return;
-      if (query.isLoading || query.dataUpdatedAt === 0) return;
-      if ((query.data?.length ?? 0) > 0) return;
-      autoSeededRef.current.add(key);
-      Promise.all(items()).then(() => queryClient.invalidateQueries({ queryKey: ["firestore", key] }));
-    };
-    maybeSeed("domains", domainsQuery, () =>
-      seedDomains.map((d) => upsertDocById(COLLECTIONS.domains, d.slug, asRecord(d))),
-    );
-    maybeSeed("gallery", galleryQuery, () =>
-      seedGallery.map((g) => upsertDocById(COLLECTIONS.gallery, g.id, asRecord(g))),
-    );
-    maybeSeed("reviews", testimonialsQuery, () =>
-      seedTestimonials.map((t) => upsertDocById(COLLECTIONS.reviews, t.id, asRecord(t))),
-    );
-    maybeSeed("projects", projectsQuery, () =>
-      seedProjects.map((p) => upsertDocById(COLLECTIONS.projects, p.id, asRecord(p))),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    domainsQuery.isLoading,
-    domainsQuery.dataUpdatedAt,
-    galleryQuery.isLoading,
-    galleryQuery.dataUpdatedAt,
-    testimonialsQuery.isLoading,
-    testimonialsQuery.dataUpdatedAt,
-    projectsQuery.isLoading,
-    projectsQuery.dataUpdatedAt,
-  ]);
 
   if (auth.loading) {
     return (
@@ -1527,8 +1489,17 @@ function ProjectsAdmin({
 // ---------- Domains: popup-form based add/edit ----------
 
 const DOMAIN_ICONS = [
-  "Bot", "Workflow", "Code2", "Cpu", "Wifi", "CircuitBoard",
-  "Glasses", "Plane", "Building2", "Palette", "Globe",
+  "Bot",
+  "Workflow",
+  "Code2",
+  "Cpu",
+  "Wifi",
+  "CircuitBoard",
+  "Glasses",
+  "Plane",
+  "Building2",
+  "Palette",
+  "Globe",
 ];
 
 let domainListKeySeq = 0;
@@ -1602,7 +1573,8 @@ function DomainFormModal({
     }
   };
 
-  const addItem = () => setValues((v) => ({ ...v, items: [...v.items, { _key: domainListKeySeq++, value: "" }] }));
+  const addItem = () =>
+    setValues((v) => ({ ...v, items: [...v.items, { _key: domainListKeySeq++, value: "" }] }));
   const updateItem = (key: number, value: string) =>
     setValues((v) => ({ ...v, items: v.items.map((i) => (i._key === key ? { ...i, value } : i)) }));
   const removeItem = (key: number) =>
@@ -1625,7 +1597,8 @@ function DomainFormModal({
     setValues((v) => ({ ...v, faq: [...v.faq, { _key: domainListKeySeq++, q: "", a: "" }] }));
   const updateFaq = (key: number, patch: Partial<{ q: string; a: string }>) =>
     setValues((v) => ({ ...v, faq: v.faq.map((f) => (f._key === key ? { ...f, ...patch } : f)) }));
-  const removeFaq = (key: number) => setValues((v) => ({ ...v, faq: v.faq.filter((f) => f._key !== key) }));
+  const removeFaq = (key: number) =>
+    setValues((v) => ({ ...v, faq: v.faq.filter((f) => f._key !== key) }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1654,7 +1627,9 @@ function DomainFormModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto bg-warm-white">
         <DialogHeader>
-          <DialogTitle className="font-display">{initial ? "Edit domain" : "Add domain"}</DialogTitle>
+          <DialogTitle className="font-display">
+            {initial ? "Edit domain" : "Add domain"}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -1682,7 +1657,11 @@ function DomainFormModal({
                 disabled={uploading}
                 className="inline-flex items-center gap-2 rounded-lg border border-border bg-warm-white px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary disabled:opacity-60"
               >
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="h-4 w-4" />
+                )}
                 {values.banner ? "Replace image" : "Upload image"}
               </button>
             </div>
@@ -1704,7 +1683,9 @@ function DomainFormModal({
                 className={inputClass}
               >
                 {DOMAIN_ICONS.map((name) => (
-                  <option key={name} value={name}>{name}</option>
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
                 ))}
               </select>
             </Field>
@@ -1752,7 +1733,11 @@ function DomainFormModal({
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 What's included (checklist)
               </span>
-              <button type="button" onClick={addItem} className="text-xs font-semibold text-copper-dark hover:underline">
+              <button
+                type="button"
+                onClick={addItem}
+                className="text-xs font-semibold text-copper-dark hover:underline"
+              >
                 + Add item
               </button>
             </div>
@@ -1782,7 +1767,11 @@ function DomainFormModal({
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Services offered
               </span>
-              <button type="button" onClick={addService} className="text-xs font-semibold text-copper-dark hover:underline">
+              <button
+                type="button"
+                onClick={addService}
+                className="text-xs font-semibold text-copper-dark hover:underline"
+              >
                 + Add service
               </button>
             </div>
@@ -1822,7 +1811,11 @@ function DomainFormModal({
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 FAQ
               </span>
-              <button type="button" onClick={addFaq} className="text-xs font-semibold text-copper-dark hover:underline">
+              <button
+                type="button"
+                onClick={addFaq}
+                className="text-xs font-semibold text-copper-dark hover:underline"
+              >
                 + Add question
               </button>
             </div>
@@ -1907,11 +1900,19 @@ function DomainsAdmin({
     if (editing) {
       mutations.update.mutate(
         { id: editing.id, data },
-        { onSuccess: () => { toast.success("Domain updated"); setModalOpen(false); } },
+        {
+          onSuccess: () => {
+            toast.success("Domain updated");
+            setModalOpen(false);
+          },
+        },
       );
     } else {
       mutations.create.mutate(data, {
-        onSuccess: () => { toast.success("Domain added"); setModalOpen(false); },
+        onSuccess: () => {
+          toast.success("Domain added");
+          setModalOpen(false);
+        },
       });
     }
   };
@@ -1925,7 +1926,10 @@ function DomainsAdmin({
           placeholder="Search domains…"
           className="flex-1 min-w-48 rounded-lg border border-border bg-warm-white px-3 py-2 text-sm outline-none focus:border-copper"
         />
-        <button onClick={openAdd} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+        <button
+          onClick={openAdd}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+        >
           <Plus className="h-4 w-4" /> Add domain
         </button>
       </div>
@@ -1945,7 +1949,9 @@ function DomainsAdmin({
               <tr key={d.id} className="border-b border-border/60 hover:bg-secondary/40">
                 <td className="py-3 pr-4">
                   <div className="flex items-center gap-3">
-                    {d.banner && <img src={d.banner} alt="" className="h-9 w-9 rounded-lg object-cover" />}
+                    {d.banner && (
+                      <img src={d.banner} alt="" className="h-9 w-9 rounded-lg object-cover" />
+                    )}
                     <span className="font-medium text-foreground">{d.title}</span>
                   </div>
                 </td>
@@ -1953,11 +1959,18 @@ function DomainsAdmin({
                 <td className="py-3 pr-4 text-muted-foreground">{d.order}</td>
                 <td className="py-3 pr-4 text-muted-foreground">{d.featured ? "yes" : "no"}</td>
                 <td className="py-3 text-right">
-                  <button onClick={() => openEdit(d)} className="rounded p-1.5 text-muted-foreground hover:bg-secondary hover:text-copper-dark" aria-label="Edit">
+                  <button
+                    onClick={() => openEdit(d)}
+                    className="rounded p-1.5 text-muted-foreground hover:bg-secondary hover:text-copper-dark"
+                    aria-label="Edit"
+                  >
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={() => { mutations.remove.mutate(d.id); toast.success("Deleted"); }}
+                    onClick={() => {
+                      mutations.remove.mutate(d.id);
+                      toast.success("Deleted");
+                    }}
                     className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     aria-label="Delete"
                   >
@@ -1967,12 +1980,22 @@ function DomainsAdmin({
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No results</td></tr>
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                  No results
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </div>
-      <DomainFormModal open={modalOpen} onOpenChange={setModalOpen} initial={editing} onSubmit={handleSubmit} submitting={submitting} />
+      <DomainFormModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        initial={editing}
+        onSubmit={handleSubmit}
+        submitting={submitting}
+      />
     </div>
   );
 }
@@ -2071,7 +2094,11 @@ function OfferFormModal({
                 disabled={uploading}
                 className="inline-flex items-center gap-2 rounded-lg border border-border bg-warm-white px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary disabled:opacity-60"
               >
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="h-4 w-4" />
+                )}
                 {values.banner ? "Replace image" : "Upload image (optional)"}
               </button>
             </div>
@@ -2169,11 +2196,19 @@ function OffersAdmin({
     if (editing) {
       mutations.update.mutate(
         { id: editing.id, data },
-        { onSuccess: () => { toast.success("Offer updated"); setModalOpen(false); } },
+        {
+          onSuccess: () => {
+            toast.success("Offer updated");
+            setModalOpen(false);
+          },
+        },
       );
     } else {
       mutations.create.mutate(data, {
-        onSuccess: () => { toast.success("Offer added"); setModalOpen(false); },
+        onSuccess: () => {
+          toast.success("Offer added");
+          setModalOpen(false);
+        },
       });
     }
   };
@@ -2182,18 +2217,25 @@ function OffersAdmin({
     <div className="rounded-2xl bg-warm-white p-6 shadow-sm">
       <div className="mb-4 flex justify-between">
         <h3 className="font-semibold text-foreground">Offers</h3>
-        <button onClick={openAdd} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+        <button
+          onClick={openAdd}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+        >
           <Plus className="h-4 w-4" /> Add offer
         </button>
       </div>
       <div className="space-y-3">
         {offers.map((o) => (
           <div key={o.id} className="flex items-center gap-4 rounded-xl border border-border p-4">
-            {o.banner && <img src={o.banner} alt="" className="h-14 w-14 rounded-lg object-cover" />}
+            {o.banner && (
+              <img src={o.banner} alt="" className="h-14 w-14 rounded-lg object-cover" />
+            )}
             <div className="flex-1">
               <div className="font-semibold text-foreground">
                 {o.title}{" "}
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${o.active ? "bg-secondary text-copper-dark" : "bg-destructive/10 text-destructive"}`}>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${o.active ? "bg-secondary text-copper-dark" : "bg-destructive/10 text-destructive"}`}
+                >
                   {o.active ? "active" : "inactive"}
                 </span>
               </div>
@@ -2203,11 +2245,18 @@ function OffersAdmin({
               <p className="mt-1 text-sm text-muted-foreground">{o.description}</p>
             </div>
             <div className="flex gap-1">
-              <button onClick={() => openEdit(o)} className="rounded p-1.5 text-muted-foreground hover:bg-secondary hover:text-copper-dark" aria-label="Edit">
+              <button
+                onClick={() => openEdit(o)}
+                className="rounded p-1.5 text-muted-foreground hover:bg-secondary hover:text-copper-dark"
+                aria-label="Edit"
+              >
                 <Pencil className="h-4 w-4" />
               </button>
               <button
-                onClick={() => { mutations.remove.mutate(o.id); toast.success("Deleted"); }}
+                onClick={() => {
+                  mutations.remove.mutate(o.id);
+                  toast.success("Deleted");
+                }}
                 className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 aria-label="Delete"
               >
@@ -2216,9 +2265,17 @@ function OffersAdmin({
             </div>
           </div>
         ))}
-        {offers.length === 0 && <p className="py-8 text-center text-muted-foreground">No offers yet</p>}
+        {offers.length === 0 && (
+          <p className="py-8 text-center text-muted-foreground">No offers yet</p>
+        )}
       </div>
-      <OfferFormModal open={modalOpen} onOpenChange={setModalOpen} initial={editing} onSubmit={handleSubmit} submitting={submitting} />
+      <OfferFormModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        initial={editing}
+        onSubmit={handleSubmit}
+        submitting={submitting}
+      />
     </div>
   );
 }
@@ -2650,9 +2707,20 @@ function HeroContentEditor({
       stats: content.stats?.length ? content.stats : DEFAULT_STATS,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content.heroEyebrow, content.heroTitleTop, content.heroTitleBottom, content.heroDescription, content.primaryCtaLabel, content.secondaryCtaLabel, content.stats]);
+  }, [
+    content.heroEyebrow,
+    content.heroTitleTop,
+    content.heroTitleBottom,
+    content.heroDescription,
+    content.primaryCtaLabel,
+    content.secondaryCtaLabel,
+    content.stats,
+  ]);
 
-  const updateStat = (i: number, patch: Partial<{ value: number; suffix: string; label: string }>) =>
+  const updateStat = (
+    i: number,
+    patch: Partial<{ value: number; suffix: string; label: string }>,
+  ) =>
     setValues((v) => ({
       ...v,
       stats: (v.stats ?? DEFAULT_STATS).map((s, idx) => (idx === i ? { ...s, ...patch } : s)),

@@ -3,7 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import type { Group } from "three";
 
-const MODEL_URL = "/models/robot.glb";
+const MODEL_URL = "/models/robot-v1.glb";
 const ANIMATION_HOLD_SECONDS = 3.5;
 
 function RobotModel() {

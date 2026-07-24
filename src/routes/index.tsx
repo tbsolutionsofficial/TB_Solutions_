@@ -39,7 +39,12 @@ import { useDomains } from "@/content/domains";
 import { useProjects } from "@/content/projects";
 import { processSteps } from "@/content/process";
 import { siteConfig } from "@/content/site";
-import { useFirestoreDoc, COLLECTIONS, HOME_CONTENT_DOC_ID, type HomeContent } from "@/lib/firestore";
+import {
+  useFirestoreDoc,
+  COLLECTIONS,
+  HOME_CONTENT_DOC_ID,
+  type HomeContent,
+} from "@/lib/firestore";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -89,16 +94,26 @@ function Index() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const { data: homeContent } = useFirestoreDoc<HomeContent>(COLLECTIONS.settings, HOME_CONTENT_DOC_ID, {
-    initialData: null,
-  });
+  const { data: homeContent } = useFirestoreDoc<HomeContent>(
+    COLLECTIONS.settings,
+    HOME_CONTENT_DOC_ID,
+    {
+      initialData: null,
+    },
+  );
   const hero = {
     eyebrow: homeContent?.heroEyebrow || siteConfig.hero.eyebrow,
     titleTop: homeContent?.heroTitleTop || siteConfig.hero.titleTop,
     titleBottom: homeContent?.heroTitleBottom || siteConfig.hero.titleBottom,
     description: homeContent?.heroDescription || siteConfig.hero.description,
-    primaryCta: { ...siteConfig.hero.primaryCta, label: homeContent?.primaryCtaLabel || siteConfig.hero.primaryCta.label },
-    secondaryCta: { ...siteConfig.hero.secondaryCta, label: homeContent?.secondaryCtaLabel || siteConfig.hero.secondaryCta.label },
+    primaryCta: {
+      ...siteConfig.hero.primaryCta,
+      label: homeContent?.primaryCtaLabel || siteConfig.hero.primaryCta.label,
+    },
+    secondaryCta: {
+      ...siteConfig.hero.secondaryCta,
+      label: homeContent?.secondaryCtaLabel || siteConfig.hero.secondaryCta.label,
+    },
   };
   const stats = homeContent?.stats?.length ? homeContent.stats : siteConfig.stats;
 

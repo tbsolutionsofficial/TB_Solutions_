@@ -42,6 +42,19 @@ export default defineConfig(({ command }) => ({
     }),
     viteReact(),
     // nitro/vite only makes sense for the production server build, not `vite dev`.
-    ...(command === "build" ? [nitro({ preset: "vercel" })] : []),
+    ...(command === "build"
+      ? [
+          nitro({
+            preset: "vercel",
+            routeRules: {
+              // Versioned filename (bump on model updates) — safe to cache immutably,
+              // avoids the mandatory revalidation round-trip on every page load.
+              "/models/**": {
+                headers: { "cache-control": "public, max-age=31536000, immutable" },
+              },
+            },
+          }),
+        ]
+      : []),
   ],
 }));
