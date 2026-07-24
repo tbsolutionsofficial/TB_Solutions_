@@ -119,9 +119,13 @@ function Index() {
   };
   const stats = homeContent?.stats?.length ? homeContent.stats : siteConfig.stats;
 
-  const { data: siteSettings } = useFirestoreDoc<SiteSettings>(COLLECTIONS.settings, SITE_SETTINGS_DOC_ID, {
-    initialData: null,
-  });
+  const { data: siteSettings } = useFirestoreDoc<SiteSettings>(
+    COLLECTIONS.settings,
+    SITE_SETTINGS_DOC_ID,
+    {
+      initialData: null,
+    },
+  );
   const contactEmail = siteSettings?.email || siteConfig.contact.email;
 
   const { scrollYProgress: heroProgress } = useScroll({

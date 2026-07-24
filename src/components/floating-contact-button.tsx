@@ -2,15 +2,24 @@ import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { MessageCircle, Instagram, Linkedin, Twitter, Mail } from "lucide-react";
-import { useFirestoreDoc, COLLECTIONS, SITE_SETTINGS_DOC_ID, type SiteSettings } from "@/lib/firestore";
+import {
+  useFirestoreDoc,
+  COLLECTIONS,
+  SITE_SETTINGS_DOC_ID,
+  type SiteSettings,
+} from "@/lib/firestore";
 
 const CYCLE_SECONDS = 3.5;
 
 export function FloatingContactButton() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { data: settings } = useFirestoreDoc<SiteSettings>(COLLECTIONS.settings, SITE_SETTINGS_DOC_ID, {
-    initialData: null,
-  });
+  const { data: settings } = useFirestoreDoc<SiteSettings>(
+    COLLECTIONS.settings,
+    SITE_SETTINGS_DOC_ID,
+    {
+      initialData: null,
+    },
+  );
 
   const links = [
     settings?.whatsapp

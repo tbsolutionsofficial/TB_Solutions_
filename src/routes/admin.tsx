@@ -23,7 +23,13 @@ import {
   Ban,
   Upload,
 } from "lucide-react";
-import { parseCsvFile, downloadCsvTemplate, splitList, splitLabeledPairs, splitDoublePairs } from "@/lib/csv-import";
+import {
+  parseCsvFile,
+  downloadCsvTemplate,
+  splitList,
+  splitLabeledPairs,
+  splitDoublePairs,
+} from "@/lib/csv-import";
 import {
   LineChart,
   Line,
@@ -1408,7 +1414,9 @@ function CsvImportButton({
         imported++;
       }
       await queryClient.invalidateQueries({ queryKey: ["firestore", collectionName] });
-      toast.success(`Imported ${imported}${skipped ? `, skipped ${skipped} (missing title)` : ""}.`);
+      toast.success(
+        `Imported ${imported}${skipped ? `, skipped ${skipped} (missing title)` : ""}.`,
+      );
     } catch (err) {
       console.error(err);
       toast.error("CSV import failed. Check the file matches the template format.");
@@ -1434,6 +1442,7 @@ function CsvImportButton({
         type="button"
         onClick={() => fileInputRef.current?.click()}
         disabled={importing}
+        title="Separate list items with ; or | — for FAQ/services/links, put the two parts either side of :: and separate whole entries with ; or ||"
         className="inline-flex items-center gap-2 rounded-lg border border-border bg-warm-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-60"
       >
         {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -1446,14 +1455,32 @@ function CsvImportButton({
       >
         Download template
       </button>
+      <span className="text-xs text-muted-foreground">
+        (lists: <code>;</code> or <code>|</code> — pairs: <code>label::value</code>, entries
+        separated by <code>;</code> or <code>||</code>)
+      </span>
     </div>
   );
 }
 
 const PROJECT_CSV_COLUMNS = [
-  "title", "tag", "domain", "description", "fullDescription", "image", "images",
-  "techStack", "tags", "client", "completionDate", "status", "featured", "sortOrder",
-  "github", "website", "extraLinks",
+  "title",
+  "tag",
+  "domain",
+  "description",
+  "fullDescription",
+  "image",
+  "images",
+  "techStack",
+  "tags",
+  "client",
+  "completionDate",
+  "status",
+  "featured",
+  "sortOrder",
+  "github",
+  "website",
+  "extraLinks",
 ];
 
 const PROJECT_CSV_EXAMPLE: Record<string, string> = {
@@ -1476,7 +1503,9 @@ const PROJECT_CSV_EXAMPLE: Record<string, string> = {
   extraLinks: "YouTube|https://youtube.com/watch?v=xyz;Docs|https://docs.example.com",
 };
 
-function projectRowToDoc(row: Record<string, string>): { id: string; data: Record<string, unknown> } | null {
+function projectRowToDoc(
+  row: Record<string, string>,
+): { id: string; data: Record<string, unknown> } | null {
   const title = row.title?.trim();
   if (!title) return null;
   const slug = slugify(title);
@@ -1510,7 +1539,16 @@ function projectRowToDoc(row: Record<string, string>): { id: string; data: Recor
 }
 
 const DOMAIN_CSV_COLUMNS = [
-  "title", "icon", "short", "overview", "banner", "featured", "order", "items", "services", "faq",
+  "title",
+  "icon",
+  "short",
+  "overview",
+  "banner",
+  "featured",
+  "order",
+  "items",
+  "services",
+  "faq",
 ];
 
 const DOMAIN_CSV_EXAMPLE: Record<string, string> = {
@@ -1522,11 +1560,14 @@ const DOMAIN_CSV_EXAMPLE: Record<string, string> = {
   featured: "true",
   order: "5",
   items: "Object detection;Defect inspection;Face recognition",
-  services: "Model training::Custom CV models for your use case;Edge deployment::Run models on-device",
+  services:
+    "Model training::Custom CV models for your use case;Edge deployment::Run models on-device",
   faq: "How long does a project take?::Typically 4-8 weeks depending on scope.;Do you provide hardware?::We can recommend and source it, or work with what you have.",
 };
 
-function domainRowToDoc(row: Record<string, string>): { id: string; data: Record<string, unknown> } | null {
+function domainRowToDoc(
+  row: Record<string, string>,
+): { id: string; data: Record<string, unknown> } | null {
   const title = row.title?.trim();
   if (!title) return null;
   const slug = slugify(title);
