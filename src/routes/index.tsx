@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   Bot,
@@ -27,6 +27,7 @@ import { GallerySection } from "@/components/sections/gallery-section";
 import { TestimonialsSection } from "@/components/sections/testimonials-section";
 import { ContactFormMagic } from "@/components/contact-form-magic";
 import { MagneticButton } from "@/components/magnetic-button";
+import { HeroRobot3D } from "@/components/hero-robot-3d";
 import logoAsset from "@/assets/tb-solutions-logo.png";
 import heroRobot from "@/assets/hero-robot.png";
 import roboticHand from "@/assets/robotic-hand-torch.png";
@@ -83,6 +84,9 @@ function Index() {
   const heroRef = useRef<HTMLElement>(null);
   const { data: domains = [] } = useDomains();
   const { data: projects = [] } = useProjects();
+  // @react-three/fiber's <Canvas> needs a real browser (WebGL) — never render it during SSR.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const { scrollYProgress: heroProgress } = useScroll({
     target: heroRef,
@@ -206,14 +210,30 @@ function Index() {
               animate={{ opacity: [0.4, 0.85, 0.4], scale: [0.9, 1.1, 0.9] }}
               transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
             />
-            <motion.img
-              src={heroRobot}
-              alt="TB_Solutions humanoid robot"
-              className="relative h-full w-full animate-breathe object-contain"
+            <motion.div
+              className="relative h-full w-full"
               initial={{ opacity: 0, scale: 0.9, rotateY: -15 }}
               animate={{ opacity: 1, scale: 1, rotateY: 0 }}
               transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            />
+            >
+              {mounted ? (
+                <HeroRobot3D
+                  fallback={
+                    <img
+                      src={heroRobot}
+                      alt="TB_Solutions humanoid robot"
+                      className="h-full w-full animate-breathe object-contain"
+                    />
+                  }
+                />
+              ) : (
+                <img
+                  src={heroRobot}
+                  alt="TB_Solutions humanoid robot"
+                  className="h-full w-full animate-breathe object-contain"
+                />
+              )}
+            </motion.div>
 
             <motion.img
               src={drone}

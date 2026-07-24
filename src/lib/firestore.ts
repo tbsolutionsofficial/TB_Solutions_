@@ -1,4 +1,4 @@
-import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs } from "firebase/firestore";
+import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, setDoc } from "firebase/firestore";
 import { useQuery, useQueryClient, useMutation, type UseQueryOptions } from "@tanstack/react-query";
 import { db } from "./firebase";
 
@@ -56,6 +56,16 @@ export async function updateDocById(
 
 export async function deleteDocById(name: CollectionName, id: string): Promise<void> {
   await deleteDoc(doc(db, name, id));
+}
+
+// Upsert by explicit ID (merge: true) — used to seed/import known content (e.g. the
+// static seed arrays) without creating duplicates on repeated runs.
+export async function upsertDocById(
+  name: CollectionName,
+  id: string,
+  data: Record<string, unknown>,
+): Promise<void> {
+  await setDoc(doc(db, name, id), data, { merge: true });
 }
 
 // Generic read hook. Pass `initialData` (mapped from the static content seed) so first
