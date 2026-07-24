@@ -31,6 +31,18 @@ Either party may terminate an engagement with 30 days written notice. Work compl
 ## 9. Changes
 We may update these terms from time to time. Continued use of the site after changes constitutes acceptance.
 
-## 10. Contact
+## 10. Data Protection
+We collect only the information needed to respond to inquiries and deliver services (e.g. name, email, and project details submitted through our contact form). We do not sell client data to third parties.
+
+## 11. Force Majeure
+Neither party is liable for delays or failure to perform caused by events beyond reasonable control, including natural disasters, war, or infrastructure/service outages.
+
+## 12. Governing Law
+These terms are governed by the laws of the jurisdiction in which TB_Solutions is registered, without regard to conflict-of-law principles.
+
+## 13. Dispute Resolution
+Both parties agree to first attempt to resolve any dispute through good-faith negotiation before pursuing formal legal proceedings.
+
+## 14. Contact
 Questions about these terms? Email us at **hello@tbsolutions.dev**.
 `;

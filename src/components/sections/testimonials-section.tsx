@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Star, Quote, Sparkles, Loader2 } from "lucide-react";
+import { Star, Quote, Sparkles, Loader2, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { testimonials as testimonialsFallback, useTestimonials } from "@/content/testimonials";
 import { createDoc, COLLECTIONS } from "@/lib/firestore";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,22 @@ function WriteReviewModal({
   const [values, setValues] = useState({ name: "", company: "", role: "", domain: "", review: "" });
   const [stars, setStars] = useState(5);
   const [submitting, setSubmitting] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarUpload = async (file: File) => {
+    setUploadingAvatar(true);
+    try {
+      const result = await uploadToCloudinary(file, "tb-solutions/reviewers");
+      setAvatarUrl(result.url);
+    } catch (err) {
+      console.error(err);
+      toast.error("Photo upload failed.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +55,7 @@ function WriteReviewModal({
         name: values.name,
         company: values.company || "—",
         role: values.role || "—",
-        avatar: `https://i.pravatar.cc/120?u=${encodeURIComponent(values.name)}`,
+        avatar: avatarUrl || `https://i.pravatar.cc/120?u=${encodeURIComponent(values.name)}`,
         stars,
         review: values.review,
         domain: values.domain || "General",
@@ -48,6 +65,7 @@ function WriteReviewModal({
       toast.success("Thanks! Your review will appear once approved.");
       setValues({ name: "", company: "", role: "", domain: "", review: "" });
       setStars(5);
+      setAvatarUrl("");
       onOpenChange(false);
     } catch (err) {
       console.error(err);
@@ -64,6 +82,40 @@ function WriteReviewModal({
           <DialogTitle className="font-display">Write a review</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Your photo (optional)
+            </span>
+            <div className="flex items-center gap-4">
+              {avatarUrl && (
+                <img src={avatarUrl} alt="" className="h-12 w-12 rounded-full object-cover" />
+              )}
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleAvatarUpload(file);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-warm-white px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary disabled:opacity-60"
+              >
+                {uploadingAvatar ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="h-4 w-4" />
+                )}
+                {avatarUrl ? "Replace photo" : "Upload photo"}
+              </button>
+            </div>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">

@@ -53,7 +53,8 @@ function ProjectPage() {
   };
   const project = useProject(loaderProject.slug) ?? loaderProject;
 
-  const gallery = project.images?.length ? project.images : [project.image];
+  const hasGallery = (project.images?.length ?? 0) > 0;
+  const gallery = hasGallery ? project.images : [project.image];
   const links = [
     project.urls?.github ? { label: "GitHub", href: project.urls.github, icon: Github } : null,
     project.urls?.website
@@ -120,8 +121,8 @@ function ProjectPage() {
 
       <section className="px-5 pb-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
-          {gallery.length > 1 && (
-            <div className="grid gap-4 sm:grid-cols-2">
+          {hasGallery && (
+            <div className={`grid gap-4 ${gallery.length > 1 ? "sm:grid-cols-2" : ""}`}>
               {gallery.map((src, i) => (
                 <img
                   key={src + i}

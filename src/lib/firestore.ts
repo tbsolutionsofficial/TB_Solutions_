@@ -24,6 +24,11 @@ export const COLLECTIONS = {
 
 export const SITE_SETTINGS_DOC_ID = "site";
 export const HOME_CONTENT_DOC_ID = "home";
+export const TERMS_DOC_ID = "terms";
+
+export interface TermsContent {
+  content: string;
+}
 
 export interface HomeContent {
   heroEyebrow?: string;

@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { termsContent } from "@/content/terms";
+import { useFirestoreDoc, COLLECTIONS, TERMS_DOC_ID, type TermsContent } from "@/lib/firestore";
 
 export const Route = createFileRoute("/terms")({
   head: () => ({
@@ -17,6 +18,11 @@ export const Route = createFileRoute("/terms")({
 });
 
 function TermsPage() {
+  const { data } = useFirestoreDoc<TermsContent>(COLLECTIONS.settings, TERMS_DOC_ID, {
+    initialData: null,
+  });
+  const content = data?.content || termsContent;
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -25,7 +31,7 @@ function TermsPage() {
           ← Back to home
         </Link>
         <article className="prose prose-neutral mt-8 max-w-none prose-headings:font-display prose-headings:text-foreground prose-h1:text-5xl prose-h2:text-2xl prose-h2:text-copper-dark prose-p:text-foreground/85 prose-strong:text-foreground prose-a:text-copper-dark">
-          <ReactMarkdown>{termsContent}</ReactMarkdown>
+          <ReactMarkdown>{content}</ReactMarkdown>
         </article>
       </main>
       <Footer />

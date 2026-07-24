@@ -13,6 +13,7 @@ import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
 import { LightbulbCursor } from "@/components/lightbulb-cursor";
 import { SmoothScroll } from "@/components/smooth-scroll";
+import { FloatingContactButton } from "@/components/floating-contact-button";
 import { getAnalyticsInstance } from "@/lib/firebase";
 
 function NotFoundComponent() {
@@ -167,6 +168,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <SmoothScroll />
       <LightbulbCursor />
+      <FloatingContactButton />
       <Toaster richColors position="top-right" />
       <Outlet />
     </QueryClientProvider>

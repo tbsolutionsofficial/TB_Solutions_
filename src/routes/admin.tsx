@@ -21,7 +21,9 @@ import {
   Camera,
   Check,
   Ban,
+  Upload,
 } from "lucide-react";
+import { parseCsvFile, downloadCsvTemplate, splitList, splitLabeledPairs, splitDoublePairs } from "@/lib/csv-import";
 import {
   LineChart,
   Line,
@@ -48,10 +50,14 @@ import {
   upsertDocById,
   SITE_SETTINGS_DOC_ID,
   HOME_CONTENT_DOC_ID,
+  TERMS_DOC_ID,
+  type CollectionName,
   type SiteSettings,
   type HomeContent,
+  type TermsContent,
   type Offer,
 } from "@/lib/firestore";
+import { termsContent as defaultTermsContent } from "@/content/terms";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import {
   Dialog,
@@ -150,6 +156,9 @@ function AdminPage() {
   const homeContentQuery = useFirestoreDoc<HomeContent>(COLLECTIONS.settings, HOME_CONTENT_DOC_ID, {
     initialData: null,
   });
+  const termsQuery = useFirestoreDoc<TermsContent>(COLLECTIONS.settings, TERMS_DOC_ID, {
+    initialData: null,
+  });
   const offersQuery = useFirestoreCollection<Offer>(COLLECTIONS.offers, {
     initialData: mockOffers.map((o) => ({ ...o, id: o.id })),
   });
@@ -194,6 +203,20 @@ function AdminPage() {
       toast.error("Failed to save. Check Firestore rules allow writes for this account.");
     } finally {
       setSavingHomeContent(false);
+    }
+  };
+  const [savingTerms, setSavingTerms] = useState(false);
+  const handleSaveTerms = async (content: string) => {
+    setSavingTerms(true);
+    try {
+      await upsertDocById(COLLECTIONS.settings, TERMS_DOC_ID, { content });
+      await queryClient.invalidateQueries({ queryKey: ["firestore", COLLECTIONS.settings] });
+      toast.success("Terms & Conditions saved.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save. Check Firestore rules allow writes for this account.");
+    } finally {
+      setSavingTerms(false);
     }
   };
   const queryClient = useQueryClient();
@@ -378,6 +401,11 @@ function AdminPage() {
                 settings={settingsQuery.data ?? {}}
                 onSave={handleSaveSettings}
                 saving={savingSettings}
+              />
+              <TermsEditor
+                content={termsQuery.data?.content ?? defaultTermsContent}
+                onSave={handleSaveTerms}
+                saving={savingTerms}
               />
             </div>
           )}
@@ -1343,6 +1371,185 @@ function ProjectFormModal({
   );
 }
 
+// ---------- CSV bulk import (shared by Projects and Domains) ----------
+
+function CsvImportButton({
+  label,
+  columns,
+  exampleRow,
+  templateFilename,
+  mapRow,
+  collectionName,
+}: {
+  label: string;
+  columns: string[];
+  exampleRow: Record<string, string>;
+  templateFilename: string;
+  mapRow: (row: Record<string, string>) => { id: string; data: Record<string, unknown> } | null;
+  collectionName: CollectionName;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleFile = async (file: File) => {
+    setImporting(true);
+    let imported = 0;
+    let skipped = 0;
+    try {
+      const rows = await parseCsvFile(file);
+      for (const row of rows) {
+        const mapped = mapRow(row);
+        if (!mapped) {
+          skipped++;
+          continue;
+        }
+        await upsertDocById(collectionName, mapped.id, mapped.data);
+        imported++;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["firestore", collectionName] });
+      toast.success(`Imported ${imported}${skipped ? `, skipped ${skipped} (missing title)` : ""}.`);
+    } catch (err) {
+      console.error(err);
+      toast.error("CSV import failed. Check the file matches the template format.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleFile(file);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={importing}
+        className="inline-flex items-center gap-2 rounded-lg border border-border bg-warm-white px-4 py-2 text-sm font-semibold text-foreground hover:bg-secondary disabled:opacity-60"
+      >
+        {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        {label}
+      </button>
+      <button
+        type="button"
+        onClick={() => downloadCsvTemplate(columns, exampleRow, templateFilename)}
+        className="text-xs font-semibold text-copper-dark hover:underline"
+      >
+        Download template
+      </button>
+    </div>
+  );
+}
+
+const PROJECT_CSV_COLUMNS = [
+  "title", "tag", "domain", "description", "fullDescription", "image", "images",
+  "techStack", "tags", "client", "completionDate", "status", "featured", "sortOrder",
+  "github", "website", "extraLinks",
+];
+
+const PROJECT_CSV_EXAMPLE: Record<string, string> = {
+  title: "Smart Irrigation System",
+  tag: "IoT",
+  domain: "iot-smart-systems",
+  description: "Short one-line summary shown on the project card.",
+  fullDescription: "Longer paragraph shown on the full project page.",
+  image: "https://res.cloudinary.com/.../cover.jpg",
+  images: "https://.../1.jpg;https://.../2.jpg",
+  techStack: "ESP32;Arduino;React",
+  tags: "IoT;Automation",
+  client: "Acme Farms",
+  completionDate: "2026-01-15",
+  status: "published",
+  featured: "true",
+  sortOrder: "1",
+  github: "https://github.com/you/repo",
+  website: "https://demo.example.com",
+  extraLinks: "YouTube|https://youtube.com/watch?v=xyz;Docs|https://docs.example.com",
+};
+
+function projectRowToDoc(row: Record<string, string>): { id: string; data: Record<string, unknown> } | null {
+  const title = row.title?.trim();
+  if (!title) return null;
+  const slug = slugify(title);
+  const tags = splitList(row.tags);
+  return {
+    id: slug,
+    data: {
+      title,
+      slug,
+      tag: row.tag || "",
+      domain: row.domain || "",
+      description: row.description || "",
+      fullDescription: row.fullDescription || row.description || "",
+      image: row.image || "",
+      images: splitList(row.images),
+      techStack: splitList(row.techStack),
+      tags,
+      client: row.client || "",
+      completionDate: row.completionDate || "",
+      status: row.status?.trim() || "draft",
+      featured: row.featured?.trim().toLowerCase() === "true",
+      sortOrder: Number(row.sortOrder) || 0,
+      urls: {
+        github: row.github || null,
+        website: row.website || null,
+        extraLinks: splitLabeledPairs(row.extraLinks),
+      },
+      seo: { title, description: row.description || "", keywords: tags },
+    },
+  };
+}
+
+const DOMAIN_CSV_COLUMNS = [
+  "title", "icon", "short", "overview", "banner", "featured", "order", "items", "services", "faq",
+];
+
+const DOMAIN_CSV_EXAMPLE: Record<string, string> = {
+  title: "Computer Vision",
+  icon: "Bot",
+  short: "Image and video intelligence for real-world automation.",
+  overview: "Longer paragraph describing this domain in depth.",
+  banner: "https://res.cloudinary.com/.../banner.jpg",
+  featured: "true",
+  order: "5",
+  items: "Object detection;Defect inspection;Face recognition",
+  services: "Model training::Custom CV models for your use case;Edge deployment::Run models on-device",
+  faq: "How long does a project take?::Typically 4-8 weeks depending on scope.;Do you provide hardware?::We can recommend and source it, or work with what you have.",
+};
+
+function domainRowToDoc(row: Record<string, string>): { id: string; data: Record<string, unknown> } | null {
+  const title = row.title?.trim();
+  if (!title) return null;
+  const slug = slugify(title);
+  const services = splitDoublePairs(row.services).map(([t, d]) => ({ title: t, description: d }));
+  const faq = splitDoublePairs(row.faq).map(([q, a]) => ({ q, a }));
+  return {
+    id: slug,
+    data: {
+      title,
+      slug,
+      icon: DOMAIN_ICONS.includes(row.icon?.trim()) ? row.icon.trim() : "Bot",
+      short: row.short || "",
+      overview: row.overview || "",
+      banner: row.banner || "",
+      featured: row.featured?.trim().toLowerCase() === "true",
+      order: Number(row.order) || 0,
+      items: splitList(row.items),
+      services,
+      faq,
+    },
+  };
+}
+
 function ProjectsAdmin({
   projects,
   domains,
@@ -1404,6 +1611,14 @@ function ProjectsAdmin({
         >
           <Plus className="h-4 w-4" /> Add project
         </button>
+        <CsvImportButton
+          label="Upload CSV"
+          columns={PROJECT_CSV_COLUMNS}
+          exampleRow={PROJECT_CSV_EXAMPLE}
+          templateFilename="projects-template.csv"
+          mapRow={projectRowToDoc}
+          collectionName={COLLECTIONS.projects}
+        />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
@@ -1932,6 +2147,14 @@ function DomainsAdmin({
         >
           <Plus className="h-4 w-4" /> Add domain
         </button>
+        <CsvImportButton
+          label="Upload CSV"
+          columns={DOMAIN_CSV_COLUMNS}
+          exampleRow={DOMAIN_CSV_EXAMPLE}
+          templateFilename="domains-template.csv"
+          mapRow={domainRowToDoc}
+          collectionName={COLLECTIONS.domains}
+        />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
@@ -2854,8 +3077,8 @@ function ContentEditor({
   return (
     <div className="max-w-3xl space-y-4 rounded-2xl bg-warm-white p-6 shadow-sm">
       <p className="text-sm text-muted-foreground">
-        These power the footer contact details and social links on the public site. Leave a field
-        blank to hide it.
+        These power the footer and contact section details, and the social links, on the public
+        site. Leave a field blank to hide it.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
         {field("email", "Contact email", "hello@tbsolutions.dev")}
@@ -2872,6 +3095,46 @@ function ContentEditor({
       </div>
       <button
         onClick={() => onSave(values)}
+        disabled={saving}
+        className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+      >
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        Save changes
+      </button>
+    </div>
+  );
+}
+
+function TermsEditor({
+  content,
+  onSave,
+  saving,
+}: {
+  content: string;
+  onSave: (content: string) => void;
+  saving: boolean;
+}) {
+  const [value, setValue] = useState(content);
+
+  useEffect(() => {
+    setValue(content);
+  }, [content]);
+
+  return (
+    <div className="max-w-3xl space-y-3 rounded-2xl bg-warm-white p-6 shadow-sm">
+      <h3 className="font-semibold text-foreground">Terms & Conditions</h3>
+      <p className="text-sm text-muted-foreground">
+        Markdown supported (## headings, **bold**, etc.) — this renders directly on the public
+        /terms page.
+      </p>
+      <textarea
+        rows={20}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className="w-full rounded-lg border border-border bg-warm-white px-3 py-2 font-mono text-xs outline-none focus:border-copper"
+      />
+      <button
+        onClick={() => onSave(value)}
         disabled={saving}
         className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
       >

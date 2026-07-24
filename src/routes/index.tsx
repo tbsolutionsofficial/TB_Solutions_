@@ -43,7 +43,9 @@ import {
   useFirestoreDoc,
   COLLECTIONS,
   HOME_CONTENT_DOC_ID,
+  SITE_SETTINGS_DOC_ID,
   type HomeContent,
+  type SiteSettings,
 } from "@/lib/firestore";
 
 export const Route = createFileRoute("/")({
@@ -116,6 +118,11 @@ function Index() {
     },
   };
   const stats = homeContent?.stats?.length ? homeContent.stats : siteConfig.stats;
+
+  const { data: siteSettings } = useFirestoreDoc<SiteSettings>(COLLECTIONS.settings, SITE_SETTINGS_DOC_ID, {
+    initialData: null,
+  });
+  const contactEmail = siteSettings?.email || siteConfig.contact.email;
 
   const { scrollYProgress: heroProgress } = useScroll({
     target: heroRef,
@@ -610,7 +617,7 @@ function Index() {
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">Email us</div>
-                  <div className="font-medium text-foreground">{siteConfig.contact.email}</div>
+                  <div className="font-medium text-foreground">{contactEmail}</div>
                 </div>
               </div>
               <div className="mt-8 flex items-center gap-4">
