@@ -3,18 +3,21 @@ import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, ExternalLink, Github } from "lucide-react";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
-import { getProject, projects, useProject } from "@/content/projects";
+import { fetchProjectBySlug, projects, useProject } from "@/content/projects";
 
 export const Route = createFileRoute("/projects/$slug")({
-  loader: ({ params }) => {
-    const project = getProject(params.slug);
+  loader: async ({ params }) => {
+    const project = await fetchProjectBySlug(params.slug);
     if (!project) throw notFound();
     return { project };
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
       return {
-        meta: [{ title: "Project not found — TB_Solutions" }, { name: "robots", content: "noindex" }],
+        meta: [
+          { title: "Project not found — TB_Solutions" },
+          { name: "robots", content: "noindex" },
+        ],
       };
     }
     const p = loaderData.project;
@@ -45,7 +48,9 @@ export const Route = createFileRoute("/projects/$slug")({
 });
 
 function ProjectPage() {
-  const { project: loaderProject } = Route.useLoaderData() as { project: (typeof projects)[number] };
+  const { project: loaderProject } = Route.useLoaderData() as {
+    project: (typeof projects)[number];
+  };
   const project = useProject(loaderProject.slug) ?? loaderProject;
 
   const gallery = project.images?.length ? project.images : [project.image];
@@ -56,7 +61,11 @@ function ProjectPage() {
       : project.urls?.demo
         ? { label: "Demo", href: project.urls.demo, icon: ExternalLink }
         : null,
-    ...(project.urls?.extraLinks ?? []).map((l) => ({ label: l.label, href: l.url, icon: ExternalLink })),
+    ...(project.urls?.extraLinks ?? []).map((l) => ({
+      label: l.label,
+      href: l.url,
+      icon: ExternalLink,
+    })),
   ].filter(Boolean) as { label: string; href: string; icon: typeof ExternalLink }[];
 
   const related = projects.filter((p) => p.slug !== project.slug).slice(0, 3);
@@ -151,7 +160,10 @@ function ProjectPage() {
               </h3>
               <div className="mt-2 flex flex-wrap gap-2">
                 {(project.techStack ?? []).map((t) => (
-                  <span key={t} className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-copper-dark">
+                  <span
+                    key={t}
+                    className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-copper-dark"
+                  >
                     {t}
                   </span>
                 ))}
@@ -161,7 +173,9 @@ function ProjectPage() {
 
           <div className="mt-16 rounded-3xl bg-primary p-10 text-center text-primary-foreground">
             <h3 className="font-display text-3xl font-bold">Ready to start?</h3>
-            <p className="mt-2 opacity-90">Tell us about your {project.tag.toLowerCase()} project.</p>
+            <p className="mt-2 opacity-90">
+              Tell us about your {project.tag.toLowerCase()} project.
+            </p>
             <Link
               to="/"
               hash="contact"
@@ -187,7 +201,8 @@ function ProjectPage() {
                     <div className="font-display text-lg font-bold text-foreground">{p.title}</div>
                     <div className="mt-1 text-xs text-muted-foreground">{p.description}</div>
                     <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-copper-dark">
-                      Explore <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                      Explore{" "}
+                      <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
                     </span>
                   </Link>
                 ))}

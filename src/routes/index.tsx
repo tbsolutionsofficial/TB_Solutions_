@@ -39,6 +39,7 @@ import { useDomains } from "@/content/domains";
 import { useProjects } from "@/content/projects";
 import { processSteps } from "@/content/process";
 import { siteConfig } from "@/content/site";
+import { useFirestoreDoc, COLLECTIONS, HOME_CONTENT_DOC_ID, type HomeContent } from "@/lib/firestore";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -88,6 +89,19 @@ function Index() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const { data: homeContent } = useFirestoreDoc<HomeContent>(COLLECTIONS.settings, HOME_CONTENT_DOC_ID, {
+    initialData: null,
+  });
+  const hero = {
+    eyebrow: homeContent?.heroEyebrow || siteConfig.hero.eyebrow,
+    titleTop: homeContent?.heroTitleTop || siteConfig.hero.titleTop,
+    titleBottom: homeContent?.heroTitleBottom || siteConfig.hero.titleBottom,
+    description: homeContent?.heroDescription || siteConfig.hero.description,
+    primaryCta: { ...siteConfig.hero.primaryCta, label: homeContent?.primaryCtaLabel || siteConfig.hero.primaryCta.label },
+    secondaryCta: { ...siteConfig.hero.secondaryCta, label: homeContent?.secondaryCtaLabel || siteConfig.hero.secondaryCta.label },
+  };
+  const stats = homeContent?.stats?.length ? homeContent.stats : siteConfig.stats;
+
   const { scrollYProgress: heroProgress } = useScroll({
     target: heroRef,
     offset: ["start start", "end start"],
@@ -128,7 +142,7 @@ function Index() {
               className="inline-flex items-center gap-2 rounded-full glass px-4 py-1.5 text-sm font-semibold text-copper-dark"
             >
               <Sparkles className="h-4 w-4" />
-              {siteConfig.hero.eyebrow}
+              {hero.eyebrow}
             </motion.span>
 
             <motion.h1
@@ -137,9 +151,9 @@ function Index() {
               transition={{ duration: 0.7, delay: 0.05 }}
               className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-6xl lg:text-7xl"
             >
-              {siteConfig.hero.titleTop}
+              {hero.titleTop}
               <br />
-              <span className="text-copper-dark">{siteConfig.hero.titleBottom}</span>
+              <span className="text-copper-dark">{hero.titleBottom}</span>
             </motion.h1>
 
             <motion.p
@@ -148,7 +162,7 @@ function Index() {
               transition={{ duration: 0.6, delay: 0.15 }}
               className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl"
             >
-              {siteConfig.hero.description}
+              {hero.description}
             </motion.p>
 
             <motion.div
@@ -162,20 +176,20 @@ function Index() {
               </div>
 
               <MagneticButton
-                href={siteConfig.hero.primaryCta.href}
+                href={hero.primaryCta.href}
                 data-cursor="cta"
                 className="group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full bg-primary px-8 py-4 text-base font-semibold text-primary-foreground shadow-lg shadow-copper/30 transition-shadow hover:shadow-xl hover:shadow-copper/40"
               >
                 <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                <span className="relative">{siteConfig.hero.primaryCta.label}</span>
+                <span className="relative">{hero.primaryCta.label}</span>
                 <ArrowRight className="relative h-4 w-4 transition-transform group-hover:translate-x-1" />
               </MagneticButton>
               <MagneticButton
-                href={siteConfig.hero.secondaryCta.href}
+                href={hero.secondaryCta.href}
                 data-cursor="button"
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background/60 px-8 py-4 text-base font-semibold text-foreground backdrop-blur-sm transition-all hover:bg-secondary"
               >
-                {siteConfig.hero.secondaryCta.label}
+                {hero.secondaryCta.label}
               </MagneticButton>
             </motion.div>
 
@@ -185,7 +199,7 @@ function Index() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="mt-12 grid max-w-md grid-cols-3 gap-6"
             >
-              {siteConfig.stats.map((s) => (
+              {stats.map((s) => (
                 <div key={s.label}>
                   <div className="font-display text-3xl font-bold text-copper-dark sm:text-4xl">
                     <CountUp end={s.value} suffix={s.suffix} />
@@ -370,40 +384,40 @@ function Index() {
                 params={{ slug: project.slug }}
                 className="contents"
               >
-              <motion.div
-                data-card
-                initial={{ opacity: 0, y: 40 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.6, delay: (index % 3) * 0.08 }}
-                whileHover={{ y: -8 }}
-                className="group relative flex flex-col overflow-hidden rounded-3xl glass transition-shadow duration-500 hover:shadow-2xl hover:shadow-copper/20"
-              >
-                <div className="relative aspect-[16/10] overflow-hidden">
-                  <img
-                    src={project.image}
-                    alt={project.title}
-                    loading="lazy"
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-espresso/60 via-espresso/10 to-transparent" />
-                  <span className="absolute left-4 top-4 rounded-full bg-background/80 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-copper-dark backdrop-blur">
-                    {project.tag}
-                  </span>
-                </div>
-                <div className="flex flex-1 flex-col p-6">
-                  <h3 className="font-display text-xl font-bold text-foreground">
-                    {project.title}
-                  </h3>
-                  <p className="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
-                    {project.description}
-                  </p>
-                  <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-copper-dark">
-                    View case study
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </span>
-                </div>
-              </motion.div>
+                <motion.div
+                  data-card
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration: 0.6, delay: (index % 3) * 0.08 }}
+                  whileHover={{ y: -8 }}
+                  className="group relative flex flex-col overflow-hidden rounded-3xl glass transition-shadow duration-500 hover:shadow-2xl hover:shadow-copper/20"
+                >
+                  <div className="relative aspect-[16/10] overflow-hidden">
+                    <img
+                      src={project.image}
+                      alt={project.title}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-espresso/60 via-espresso/10 to-transparent" />
+                    <span className="absolute left-4 top-4 rounded-full bg-background/80 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-copper-dark backdrop-blur">
+                      {project.tag}
+                    </span>
+                  </div>
+                  <div className="flex flex-1 flex-col p-6">
+                    <h3 className="font-display text-xl font-bold text-foreground">
+                      {project.title}
+                    </h3>
+                    <p className="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
+                      {project.description}
+                    </p>
+                    <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-copper-dark">
+                      View case study
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </span>
+                  </div>
+                </motion.div>
               </Link>
             ))}
           </div>
@@ -473,7 +487,7 @@ function Index() {
               transition={{ duration: 0.7 }}
               className="grid gap-6"
             >
-              {siteConfig.stats.map((stat, i) => (
+              {stats.map((stat, i) => (
                 <motion.div
                   key={stat.label}
                   initial={{ opacity: 0, y: 24 }}

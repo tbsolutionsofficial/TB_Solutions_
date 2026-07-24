@@ -186,7 +186,7 @@ export const projects: Project[] = [
   },
 ];
 
-import { useFirestoreCollection, COLLECTIONS } from "@/lib/firestore";
+import { useFirestoreCollection, fetchCollection, COLLECTIONS } from "@/lib/firestore";
 
 const projectsFallback = projects.map((p) => ({ ...p, id: p.id }));
 
@@ -199,4 +199,17 @@ export const getProject = (slug: string) => projects.find((p) => p.slug === slug
 export function useProject(slug: string) {
   const { data } = useProjects();
   return (data ?? projectsFallback).find((p) => p.slug === slug);
+}
+
+// Used by the route loader (runs before any hook/query cache exists) — checks Firestore
+// first so admin-created projects resolve, falling back to the static seed.
+export async function fetchProjectBySlug(slug: string): Promise<Project | undefined> {
+  try {
+    const all = await fetchCollection<Project>(COLLECTIONS.projects);
+    const found = all.find((p) => p.slug === slug);
+    if (found) return found;
+  } catch {
+    // fall through to static seed
+  }
+  return getProject(slug);
 }

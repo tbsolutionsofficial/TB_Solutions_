@@ -3,11 +3,11 @@ import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
-import { getDomain, domains, useDomain } from "@/content/domains";
+import { fetchDomainBySlug, domains, useDomain } from "@/content/domains";
 
 export const Route = createFileRoute("/domains/$slug")({
-  loader: ({ params }) => {
-    const domain = getDomain(params.slug);
+  loader: async ({ params }) => {
+    const domain = await fetchDomainBySlug(params.slug);
     if (!domain) throw notFound();
     return { domain };
   },

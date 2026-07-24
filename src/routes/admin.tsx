@@ -47,8 +47,10 @@ import {
   useFirestoreMutations,
   upsertDocById,
   SITE_SETTINGS_DOC_ID,
-  type MediaAsset,
+  HOME_CONTENT_DOC_ID,
   type SiteSettings,
+  type HomeContent,
+  type Offer,
 } from "@/lib/firestore";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import {
@@ -58,7 +60,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { adminUser as mockAdminUser, mockContacts, mockOffers, mockMedia } from "@/mock/admin";
+import { adminUser as mockAdminUser, mockContacts, mockOffers } from "@/mock/admin";
 import { projects as seedProjects, type Project } from "@/content/projects";
 import { domains as seedDomains, type Domain } from "@/content/domains";
 import { testimonials as seedTestimonials, type Testimonial } from "@/content/testimonials";
@@ -88,7 +90,6 @@ type Tab =
   | "testimonials"
   | "contacts"
   | "offers"
-  | "media"
   | "content";
 
 const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -99,7 +100,6 @@ const tabs: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   { id: "testimonials", label: "Testimonials", icon: Star },
   { id: "contacts", label: "Contacts", icon: Mail },
   { id: "offers", label: "Offers", icon: Tag },
-  { id: "media", label: "Media", icon: ImageIcon },
   { id: "content", label: "Content", icon: FileText },
 ];
 
@@ -144,11 +144,14 @@ function AdminPage() {
   const contactsQuery = useFirestoreCollection<Contact>(COLLECTIONS.contacts, {
     initialData: mockContacts.map((c) => ({ ...c, id: c.id })),
   });
-  const mediaQuery = useFirestoreCollection<MediaAsset>(COLLECTIONS.media, {
-    initialData: mockMedia.map((m) => ({ ...m, id: m.id })),
-  });
   const settingsQuery = useFirestoreDoc<SiteSettings>(COLLECTIONS.settings, SITE_SETTINGS_DOC_ID, {
     initialData: null,
+  });
+  const homeContentQuery = useFirestoreDoc<HomeContent>(COLLECTIONS.settings, HOME_CONTENT_DOC_ID, {
+    initialData: null,
+  });
+  const offersQuery = useFirestoreCollection<Offer>(COLLECTIONS.offers, {
+    initialData: mockOffers.map((o) => ({ ...o, id: o.id })),
   });
 
   const domainsMut = useFirestoreMutations(COLLECTIONS.domains);
@@ -156,12 +159,16 @@ function AdminPage() {
   const testimonialsMut = useFirestoreMutations(COLLECTIONS.reviews);
   const projectsMut = useFirestoreMutations(COLLECTIONS.projects);
   const contactsMut = useFirestoreMutations(COLLECTIONS.contacts);
-  const mediaMut = useFirestoreMutations(COLLECTIONS.media);
+  const offersMut = useFirestoreMutations(COLLECTIONS.offers);
   const [savingSettings, setSavingSettings] = useState(false);
   const handleSaveSettings = async (data: SiteSettings) => {
     setSavingSettings(true);
     try {
-      await upsertDocById(COLLECTIONS.settings, SITE_SETTINGS_DOC_ID, data as Record<string, unknown>);
+      await upsertDocById(
+        COLLECTIONS.settings,
+        SITE_SETTINGS_DOC_ID,
+        data as Record<string, unknown>,
+      );
       await queryClient.invalidateQueries({ queryKey: ["firestore", COLLECTIONS.settings] });
       toast.success("Contact settings saved.");
     } catch (err) {
@@ -169,6 +176,20 @@ function AdminPage() {
       toast.error("Failed to save. Check Firestore rules allow writes for this account.");
     } finally {
       setSavingSettings(false);
+    }
+  };
+  const [savingHomeContent, setSavingHomeContent] = useState(false);
+  const handleSaveHomeContent = async (data: HomeContent) => {
+    setSavingHomeContent(true);
+    try {
+      await upsertDocById(COLLECTIONS.settings, HOME_CONTENT_DOC_ID, data as Record<string, unknown>);
+      await queryClient.invalidateQueries({ queryKey: ["firestore", COLLECTIONS.settings] });
+      toast.success("Homepage content saved.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save. Check Firestore rules allow writes for this account.");
+    } finally {
+      setSavingHomeContent(false);
     }
   };
   const queryClient = useQueryClient();
@@ -194,6 +215,48 @@ function AdminPage() {
     }
   };
 
+  // Auto-seed each collection independently, once, only when a REAL Firestore fetch
+  // (dataUpdatedAt > 0, i.e. past the initialData fallback) confirms it's genuinely
+  // empty — never touches a collection that already has content, so it can't clobber
+  // admin edits.
+  const autoSeededRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const asRecord = (v: unknown) => v as Record<string, unknown>;
+    const maybeSeed = (
+      key: string,
+      query: { isLoading: boolean; dataUpdatedAt: number; data?: unknown[] },
+      items: () => Promise<unknown>[],
+    ) => {
+      if (autoSeededRef.current.has(key)) return;
+      if (query.isLoading || query.dataUpdatedAt === 0) return;
+      if ((query.data?.length ?? 0) > 0) return;
+      autoSeededRef.current.add(key);
+      Promise.all(items()).then(() => queryClient.invalidateQueries({ queryKey: ["firestore", key] }));
+    };
+    maybeSeed("domains", domainsQuery, () =>
+      seedDomains.map((d) => upsertDocById(COLLECTIONS.domains, d.slug, asRecord(d))),
+    );
+    maybeSeed("gallery", galleryQuery, () =>
+      seedGallery.map((g) => upsertDocById(COLLECTIONS.gallery, g.id, asRecord(g))),
+    );
+    maybeSeed("reviews", testimonialsQuery, () =>
+      seedTestimonials.map((t) => upsertDocById(COLLECTIONS.reviews, t.id, asRecord(t))),
+    );
+    maybeSeed("projects", projectsQuery, () =>
+      seedProjects.map((p) => upsertDocById(COLLECTIONS.projects, p.id, asRecord(p))),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    domainsQuery.isLoading,
+    domainsQuery.dataUpdatedAt,
+    galleryQuery.isLoading,
+    galleryQuery.dataUpdatedAt,
+    testimonialsQuery.isLoading,
+    testimonialsQuery.dataUpdatedAt,
+    projectsQuery.isLoading,
+    projectsQuery.dataUpdatedAt,
+  ]);
+
   if (auth.loading) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-cream">
@@ -213,13 +276,6 @@ function AdminPage() {
     avatar: auth.user?.photoURL ?? null,
   };
 
-  const domainRows = (domainsQuery.data ?? []).map((d) => ({
-    id: d.id,
-    title: d.title,
-    slug: d.slug,
-    order: d.order,
-    featured: d.featured ? "yes" : "no",
-  }));
   const contactRows = (contactsQuery.data ?? []).map((c) => ({
     id: c.id,
     name: c.name,
@@ -323,33 +379,16 @@ function AdminPage() {
             />
           )}
           {tab === "domains" && (
-            <CrudTable
-              title="Domains"
-              columns={["title", "slug", "order", "featured"]}
-              rows={domainRows}
-              blankRow={{
-                title: "New domain",
-                slug: `new-${Date.now()}`,
-                order: domainRows.length + 1,
-                featured: "no",
-                icon: "Bot",
-                short: "",
-                overview: "",
-                banner: "",
-                items: [],
-                services: [],
-                faq: [],
-              }}
-              onAdd={(data) => domainsMut.create.mutate(data)}
-              onUpdate={(id, patch) => domainsMut.update.mutate({ id, data: patch })}
-              onDelete={(id) => domainsMut.remove.mutate(id)}
-            />
+            <DomainsAdmin domains={domainsQuery.data ?? []} mutations={domainsMut} />
           )}
           {tab === "gallery" && (
             <GalleryAdmin items={galleryQuery.data ?? []} mutations={galleryMut} />
           )}
           {tab === "testimonials" && (
-            <TestimonialsAdmin testimonials={testimonialsQuery.data ?? []} mutations={testimonialsMut} />
+            <TestimonialsAdmin
+              testimonials={testimonialsQuery.data ?? []}
+              mutations={testimonialsMut}
+            />
           )}
           {tab === "contacts" && (
             <CrudTable
@@ -364,32 +403,21 @@ function AdminPage() {
             />
           )}
           {tab === "offers" && (
-            <CrudTable
-              title="Offers"
-              seed={mockOffers.map((o) => ({
-                id: o.id,
-                title: o.title,
-                discount: `${o.discount}%`,
-                active: o.active ? "yes" : "no",
-              }))}
-              columns={["title", "discount", "active"]}
-            />
-          )}
-          {tab === "media" && (
-            <MediaGrid
-              items={mediaQuery.data ?? []}
-              onUpload={(asset) =>
-                mediaMut.create.mutate(asset as unknown as Record<string, unknown>)
-              }
-              onDelete={(id) => mediaMut.remove.mutate(id)}
-            />
+            <OffersAdmin offers={offersQuery.data ?? []} mutations={offersMut} />
           )}
           {tab === "content" && (
-            <ContentEditor
-              settings={settingsQuery.data ?? {}}
-              onSave={handleSaveSettings}
-              saving={savingSettings}
-            />
+            <div className="space-y-6">
+              <HeroContentEditor
+                content={homeContentQuery.data ?? {}}
+                onSave={handleSaveHomeContent}
+                saving={savingHomeContent}
+              />
+              <ContentEditor
+                settings={settingsQuery.data ?? {}}
+                onSave={handleSaveSettings}
+                saving={savingSettings}
+              />
+            </div>
           )}
         </div>
       </main>
@@ -1496,6 +1524,705 @@ function ProjectsAdmin({
   );
 }
 
+// ---------- Domains: popup-form based add/edit ----------
+
+const DOMAIN_ICONS = [
+  "Bot", "Workflow", "Code2", "Cpu", "Wifi", "CircuitBoard",
+  "Glasses", "Plane", "Building2", "Palette", "Globe",
+];
+
+let domainListKeySeq = 0;
+
+interface DomainFormValues {
+  title: string;
+  slug: string;
+  icon: string;
+  short: string;
+  overview: string;
+  banner: string;
+  featured: boolean;
+  order: number;
+  items: { _key: number; value: string }[];
+  services: { _key: number; title: string; description: string }[];
+  faq: { _key: number; q: string; a: string }[];
+}
+
+function toDomainFormValues(d?: Domain): DomainFormValues {
+  return {
+    title: d?.title ?? "",
+    slug: d?.slug ?? "",
+    icon: d?.icon ?? "Bot",
+    short: d?.short ?? "",
+    overview: d?.overview ?? "",
+    banner: d?.banner ?? "",
+    featured: d?.featured ?? false,
+    order: d?.order ?? 0,
+    items: (d?.items ?? []).map((v) => ({ _key: domainListKeySeq++, value: v })),
+    services: (d?.services ?? []).map((s) => ({
+      _key: domainListKeySeq++,
+      title: s.title,
+      description: s.description,
+    })),
+    faq: (d?.faq ?? []).map((f) => ({ _key: domainListKeySeq++, q: f.q, a: f.a })),
+  };
+}
+
+function DomainFormModal({
+  open,
+  onOpenChange,
+  initial,
+  onSubmit,
+  submitting,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial?: Domain;
+  onSubmit: (data: Record<string, unknown>) => void;
+  submitting: boolean;
+}) {
+  const [values, setValues] = useState<DomainFormValues>(() => toDomainFormValues(initial));
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) setValues(toDomainFormValues(initial));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial, open]);
+
+  const handleBannerUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const result = await uploadToCloudinary(file, "tb-solutions/domains");
+      setValues((v) => ({ ...v, banner: result.url }));
+    } catch (err) {
+      console.error(err);
+      toast.error("Image upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const addItem = () => setValues((v) => ({ ...v, items: [...v.items, { _key: domainListKeySeq++, value: "" }] }));
+  const updateItem = (key: number, value: string) =>
+    setValues((v) => ({ ...v, items: v.items.map((i) => (i._key === key ? { ...i, value } : i)) }));
+  const removeItem = (key: number) =>
+    setValues((v) => ({ ...v, items: v.items.filter((i) => i._key !== key) }));
+
+  const addService = () =>
+    setValues((v) => ({
+      ...v,
+      services: [...v.services, { _key: domainListKeySeq++, title: "", description: "" }],
+    }));
+  const updateService = (key: number, patch: Partial<{ title: string; description: string }>) =>
+    setValues((v) => ({
+      ...v,
+      services: v.services.map((s) => (s._key === key ? { ...s, ...patch } : s)),
+    }));
+  const removeService = (key: number) =>
+    setValues((v) => ({ ...v, services: v.services.filter((s) => s._key !== key) }));
+
+  const addFaq = () =>
+    setValues((v) => ({ ...v, faq: [...v.faq, { _key: domainListKeySeq++, q: "", a: "" }] }));
+  const updateFaq = (key: number, patch: Partial<{ q: string; a: string }>) =>
+    setValues((v) => ({ ...v, faq: v.faq.map((f) => (f._key === key ? { ...f, ...patch } : f)) }));
+  const removeFaq = (key: number) => setValues((v) => ({ ...v, faq: v.faq.filter((f) => f._key !== key) }));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!values.title.trim()) {
+      toast.error("Title is required.");
+      return;
+    }
+    onSubmit({
+      title: values.title,
+      slug: initial?.slug ?? slugify(values.title),
+      icon: values.icon,
+      short: values.short,
+      overview: values.overview,
+      banner: values.banner,
+      featured: values.featured,
+      order: values.order,
+      items: values.items.map((i) => i.value).filter(Boolean),
+      services: values.services
+        .filter((s) => s.title.trim())
+        .map((s) => ({ title: s.title, description: s.description })),
+      faq: values.faq.filter((f) => f.q.trim()).map((f) => ({ q: f.q, a: f.a })),
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto bg-warm-white">
+        <DialogHeader>
+          <DialogTitle className="font-display">{initial ? "Edit domain" : "Add domain"}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Banner image
+            </span>
+            <div className="flex items-center gap-4">
+              {values.banner && (
+                <img src={values.banner} alt="" className="h-16 w-16 rounded-lg object-cover" />
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleBannerUpload(file);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-warm-white px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary disabled:opacity-60"
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                {values.banner ? "Replace image" : "Upload image"}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Title">
+              <input
+                required
+                value={values.title}
+                onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Icon">
+              <select
+                value={values.icon}
+                onChange={(e) => setValues((v) => ({ ...v, icon: e.target.value }))}
+                className={inputClass}
+              >
+                {DOMAIN_ICONS.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <Field label="Short tagline">
+            <input
+              value={values.short}
+              onChange={(e) => setValues((v) => ({ ...v, short: e.target.value }))}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Overview">
+            <textarea
+              rows={3}
+              value={values.overview}
+              onChange={(e) => setValues((v) => ({ ...v, overview: e.target.value }))}
+              className={inputClass}
+            />
+          </Field>
+
+          <div className="flex items-center gap-6">
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={values.featured}
+                onChange={(e) => setValues((v) => ({ ...v, featured: e.target.checked }))}
+              />
+              Featured
+            </label>
+            <div className="w-28">
+              <Field label="Order">
+                <input
+                  type="number"
+                  value={values.order}
+                  onChange={(e) => setValues((v) => ({ ...v, order: Number(e.target.value) }))}
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                What's included (checklist)
+              </span>
+              <button type="button" onClick={addItem} className="text-xs font-semibold text-copper-dark hover:underline">
+                + Add item
+              </button>
+            </div>
+            <div className="mt-2 space-y-2">
+              {values.items.map((item) => (
+                <div key={item._key} className="flex gap-2">
+                  <input
+                    value={item.value}
+                    onChange={(e) => updateItem(item._key, e.target.value)}
+                    className={`${inputClass} flex-1`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeItem(item._key)}
+                    className="rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    aria-label="Remove item"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Services offered
+              </span>
+              <button type="button" onClick={addService} className="text-xs font-semibold text-copper-dark hover:underline">
+                + Add service
+              </button>
+            </div>
+            <div className="mt-2 space-y-2">
+              {values.services.map((s) => (
+                <div key={s._key} className="rounded-lg border border-border p-3">
+                  <div className="flex gap-2">
+                    <input
+                      placeholder="Service title"
+                      value={s.title}
+                      onChange={(e) => updateService(s._key, { title: e.target.value })}
+                      className={`${inputClass} flex-1`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeService(s._key)}
+                      className="rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Remove service"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <textarea
+                    placeholder="Description"
+                    rows={2}
+                    value={s.description}
+                    onChange={(e) => updateService(s._key, { description: e.target.value })}
+                    className={`${inputClass} mt-2`}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                FAQ
+              </span>
+              <button type="button" onClick={addFaq} className="text-xs font-semibold text-copper-dark hover:underline">
+                + Add question
+              </button>
+            </div>
+            <div className="mt-2 space-y-2">
+              {values.faq.map((f) => (
+                <div key={f._key} className="rounded-lg border border-border p-3">
+                  <div className="flex gap-2">
+                    <input
+                      placeholder="Question"
+                      value={f.q}
+                      onChange={(e) => updateFaq(f._key, { q: e.target.value })}
+                      className={`${inputClass} flex-1`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeFaq(f._key)}
+                      className="rounded p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Remove question"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <textarea
+                    placeholder="Answer"
+                    rows={2}
+                    value={f.a}
+                    onChange={(e) => updateFaq(f._key, { a: e.target.value })}
+                    className={`${inputClass} mt-2`}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="rounded-full border border-border px-5 py-2 text-sm font-semibold text-foreground hover:bg-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {initial ? "Save changes" : "Add domain"}
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DomainsAdmin({
+  domains,
+  mutations,
+}: {
+  domains: (Domain & { id: string })[];
+  mutations: ReturnType<typeof useFirestoreMutations>;
+}) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<(Domain & { id: string }) | undefined>(undefined);
+  const [q, setQ] = useState("");
+  const submitting = mutations.create.isPending || mutations.update.isPending;
+
+  const filtered = domains.filter((d) => d.title.toLowerCase().includes(q.toLowerCase()));
+
+  const openAdd = () => {
+    setEditing(undefined);
+    setModalOpen(true);
+  };
+  const openEdit = (d: Domain & { id: string }) => {
+    setEditing(d);
+    setModalOpen(true);
+  };
+
+  const handleSubmit = (data: Record<string, unknown>) => {
+    if (editing) {
+      mutations.update.mutate(
+        { id: editing.id, data },
+        { onSuccess: () => { toast.success("Domain updated"); setModalOpen(false); } },
+      );
+    } else {
+      mutations.create.mutate(data, {
+        onSuccess: () => { toast.success("Domain added"); setModalOpen(false); },
+      });
+    }
+  };
+
+  return (
+    <div className="rounded-2xl bg-warm-white p-6 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search domains…"
+          className="flex-1 min-w-48 rounded-lg border border-border bg-warm-white px-3 py-2 text-sm outline-none focus:border-copper"
+        />
+        <button onClick={openAdd} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+          <Plus className="h-4 w-4" /> Add domain
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="py-3 pr-4 font-semibold">Title</th>
+              <th className="py-3 pr-4 font-semibold">Slug</th>
+              <th className="py-3 pr-4 font-semibold">Order</th>
+              <th className="py-3 pr-4 font-semibold">Featured</th>
+              <th className="py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((d) => (
+              <tr key={d.id} className="border-b border-border/60 hover:bg-secondary/40">
+                <td className="py-3 pr-4">
+                  <div className="flex items-center gap-3">
+                    {d.banner && <img src={d.banner} alt="" className="h-9 w-9 rounded-lg object-cover" />}
+                    <span className="font-medium text-foreground">{d.title}</span>
+                  </div>
+                </td>
+                <td className="py-3 pr-4 text-muted-foreground">{d.slug}</td>
+                <td className="py-3 pr-4 text-muted-foreground">{d.order}</td>
+                <td className="py-3 pr-4 text-muted-foreground">{d.featured ? "yes" : "no"}</td>
+                <td className="py-3 text-right">
+                  <button onClick={() => openEdit(d)} className="rounded p-1.5 text-muted-foreground hover:bg-secondary hover:text-copper-dark" aria-label="Edit">
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => { mutations.remove.mutate(d.id); toast.success("Deleted"); }}
+                    className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    aria-label="Delete"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No results</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <DomainFormModal open={modalOpen} onOpenChange={setModalOpen} initial={editing} onSubmit={handleSubmit} submitting={submitting} />
+    </div>
+  );
+}
+
+// ---------- Offers: popup-form based add/edit ----------
+
+function OfferFormModal({
+  open,
+  onOpenChange,
+  initial,
+  onSubmit,
+  submitting,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial?: Offer & { id: string };
+  onSubmit: (data: Record<string, unknown>) => void;
+  submitting: boolean;
+}) {
+  const [values, setValues] = useState(() => ({
+    title: initial?.title ?? "",
+    discount: initial?.discount ?? 10,
+    description: initial?.description ?? "",
+    expiresAt: initial?.expiresAt ?? "",
+    banner: initial?.banner ?? "",
+    active: initial?.active ?? true,
+  }));
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setValues({
+        title: initial?.title ?? "",
+        discount: initial?.discount ?? 10,
+        description: initial?.description ?? "",
+        expiresAt: initial?.expiresAt ?? "",
+        banner: initial?.banner ?? "",
+        active: initial?.active ?? true,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial, open]);
+
+  const handleBannerUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const result = await uploadToCloudinary(file, "tb-solutions/offers");
+      setValues((v) => ({ ...v, banner: result.url }));
+    } catch (err) {
+      console.error(err);
+      toast.error("Image upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!values.title.trim()) {
+      toast.error("Title is required.");
+      return;
+    }
+    onSubmit(values);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg bg-warm-white">
+        <DialogHeader>
+          <DialogTitle className="font-display">{initial ? "Edit offer" : "Add offer"}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Banner image
+            </span>
+            <div className="flex items-center gap-4">
+              {values.banner && (
+                <img src={values.banner} alt="" className="h-16 w-16 rounded-lg object-cover" />
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleBannerUpload(file);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-warm-white px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary disabled:opacity-60"
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                {values.banner ? "Replace image" : "Upload image (optional)"}
+              </button>
+            </div>
+          </div>
+
+          <Field label="Title">
+            <input
+              required
+              value={values.title}
+              onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Description">
+            <textarea
+              rows={3}
+              value={values.description}
+              onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
+              className={inputClass}
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Discount (%)">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={values.discount}
+                onChange={(e) => setValues((v) => ({ ...v, discount: Number(e.target.value) }))}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Expires">
+              <input
+                type="date"
+                value={values.expiresAt}
+                onChange={(e) => setValues((v) => ({ ...v, expiresAt: e.target.value }))}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={values.active}
+              onChange={(e) => setValues((v) => ({ ...v, active: e.target.checked }))}
+            />
+            Active
+          </label>
+
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="rounded-full border border-border px-5 py-2 text-sm font-semibold text-foreground hover:bg-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {initial ? "Save changes" : "Add offer"}
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function OffersAdmin({
+  offers,
+  mutations,
+}: {
+  offers: (Offer & { id: string })[];
+  mutations: ReturnType<typeof useFirestoreMutations>;
+}) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<(Offer & { id: string }) | undefined>(undefined);
+  const submitting = mutations.create.isPending || mutations.update.isPending;
+
+  const openAdd = () => {
+    setEditing(undefined);
+    setModalOpen(true);
+  };
+  const openEdit = (o: Offer & { id: string }) => {
+    setEditing(o);
+    setModalOpen(true);
+  };
+
+  const handleSubmit = (data: Record<string, unknown>) => {
+    if (editing) {
+      mutations.update.mutate(
+        { id: editing.id, data },
+        { onSuccess: () => { toast.success("Offer updated"); setModalOpen(false); } },
+      );
+    } else {
+      mutations.create.mutate(data, {
+        onSuccess: () => { toast.success("Offer added"); setModalOpen(false); },
+      });
+    }
+  };
+
+  return (
+    <div className="rounded-2xl bg-warm-white p-6 shadow-sm">
+      <div className="mb-4 flex justify-between">
+        <h3 className="font-semibold text-foreground">Offers</h3>
+        <button onClick={openAdd} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+          <Plus className="h-4 w-4" /> Add offer
+        </button>
+      </div>
+      <div className="space-y-3">
+        {offers.map((o) => (
+          <div key={o.id} className="flex items-center gap-4 rounded-xl border border-border p-4">
+            {o.banner && <img src={o.banner} alt="" className="h-14 w-14 rounded-lg object-cover" />}
+            <div className="flex-1">
+              <div className="font-semibold text-foreground">
+                {o.title}{" "}
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${o.active ? "bg-secondary text-copper-dark" : "bg-destructive/10 text-destructive"}`}>
+                  {o.active ? "active" : "inactive"}
+                </span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {o.discount}% off · expires {o.expiresAt || "—"}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">{o.description}</p>
+            </div>
+            <div className="flex gap-1">
+              <button onClick={() => openEdit(o)} className="rounded p-1.5 text-muted-foreground hover:bg-secondary hover:text-copper-dark" aria-label="Edit">
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => { mutations.remove.mutate(o.id); toast.success("Deleted"); }}
+                className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                aria-label="Delete"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+        {offers.length === 0 && <p className="py-8 text-center text-muted-foreground">No offers yet</p>}
+      </div>
+      <OfferFormModal open={modalOpen} onOpenChange={setModalOpen} initial={editing} onSubmit={handleSubmit} submitting={submitting} />
+    </div>
+  );
+}
+
 // ---------- Gallery: popup-form based add/edit ----------
 
 function GalleryFormModal({
@@ -1801,11 +2528,16 @@ function TestimonialsAdmin({
 }) {
   const [q, setQ] = useState("");
   const filtered = testimonials.filter(
-    (t) => t.name.toLowerCase().includes(q.toLowerCase()) || t.company.toLowerCase().includes(q.toLowerCase()),
+    (t) =>
+      t.name.toLowerCase().includes(q.toLowerCase()) ||
+      t.company.toLowerCase().includes(q.toLowerCase()),
   );
 
   const setStatus = (id: string, status: Testimonial["status"]) =>
-    mutations.update.mutate({ id, data: { status } }, { onSuccess: () => toast.success(`Marked ${status}`) });
+    mutations.update.mutate(
+      { id, data: { status } },
+      { onSuccess: () => toast.success(`Marked ${status}`) },
+    );
 
   const statusBadge = (status: Testimonial["status"]) => {
     const styles =
@@ -1814,7 +2546,9 @@ function TestimonialsAdmin({
         : status === "rejected"
           ? "bg-destructive/10 text-destructive"
           : "bg-amber-500/10 text-amber-700";
-    return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles}`}>{status}</span>;
+    return (
+      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles}`}>{status}</span>
+    );
   };
 
   return (
@@ -1872,93 +2606,144 @@ function TestimonialsAdmin({
             <p className="mt-3 text-sm text-muted-foreground">"{t.review}"</p>
           </div>
         ))}
-        {filtered.length === 0 && <p className="py-8 text-center text-muted-foreground">No reviews</p>}
+        {filtered.length === 0 && (
+          <p className="py-8 text-center text-muted-foreground">No reviews</p>
+        )}
       </div>
     </div>
   );
 }
 
-function MediaGrid({
-  items,
-  onUpload,
-  onDelete,
-}: {
-  items: MediaAsset[];
-  onUpload: (asset: Omit<MediaAsset, "id">) => void;
-  onDelete: (id: string) => void;
-}) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+const DEFAULT_STATS = [
+  { value: 150, suffix: "+", label: "Projects" },
+  { value: 11, suffix: "", label: "Domains" },
+  { value: 92, suffix: "%", label: "Retention" },
+];
 
-  const handleFile = async (file: File) => {
-    setUploading(true);
-    try {
-      const result = await uploadToCloudinary(file, "tb-solutions");
-      onUpload({
-        name: file.name,
-        type: result.resourceType === "video" ? "video" : "image",
-        url: result.url,
-        publicId: result.publicId,
-        folder: "tb-solutions",
-        sizeKb: Math.round(result.bytes / 1024),
-        uploadedAt: new Date().toISOString(),
-      });
-      toast.success("Uploaded");
-    } catch (err) {
-      console.error(err);
-      toast.error("Upload failed. Please try again.");
-    } finally {
-      setUploading(false);
-    }
-  };
+function HeroContentEditor({
+  content,
+  onSave,
+  saving,
+}: {
+  content: HomeContent;
+  onSave: (data: HomeContent) => void;
+  saving: boolean;
+}) {
+  const [values, setValues] = useState<HomeContent>(() => ({
+    heroEyebrow: content.heroEyebrow ?? "",
+    heroTitleTop: content.heroTitleTop ?? "",
+    heroTitleBottom: content.heroTitleBottom ?? "",
+    heroDescription: content.heroDescription ?? "",
+    primaryCtaLabel: content.primaryCtaLabel ?? "",
+    secondaryCtaLabel: content.secondaryCtaLabel ?? "",
+    stats: content.stats?.length ? content.stats : DEFAULT_STATS,
+  }));
+
+  useEffect(() => {
+    setValues({
+      heroEyebrow: content.heroEyebrow ?? "",
+      heroTitleTop: content.heroTitleTop ?? "",
+      heroTitleBottom: content.heroTitleBottom ?? "",
+      heroDescription: content.heroDescription ?? "",
+      primaryCtaLabel: content.primaryCtaLabel ?? "",
+      secondaryCtaLabel: content.secondaryCtaLabel ?? "",
+      stats: content.stats?.length ? content.stats : DEFAULT_STATS,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content.heroEyebrow, content.heroTitleTop, content.heroTitleBottom, content.heroDescription, content.primaryCtaLabel, content.secondaryCtaLabel, content.stats]);
+
+  const updateStat = (i: number, patch: Partial<{ value: number; suffix: string; label: string }>) =>
+    setValues((v) => ({
+      ...v,
+      stats: (v.stats ?? DEFAULT_STATS).map((s, idx) => (idx === i ? { ...s, ...patch } : s)),
+    }));
 
   return (
-    <div className="rounded-2xl bg-warm-white p-6 shadow-sm">
-      <div className="mb-4 flex justify-between">
-        <h3 className="font-semibold text-foreground">Media library</h3>
+    <div className="max-w-3xl space-y-4 rounded-2xl bg-warm-white p-6 shadow-sm">
+      <h3 className="font-semibold text-foreground">Hero section</h3>
+      <Field label="Eyebrow badge">
         <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void handleFile(file);
-            e.target.value = "";
-          }}
+          value={values.heroEyebrow}
+          onChange={(e) => setValues((v) => ({ ...v, heroEyebrow: e.target.value }))}
+          className={inputClass}
         />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-        >
-          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}{" "}
-          Upload
-        </button>
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Headline (line 1)">
+          <input
+            value={values.heroTitleTop}
+            onChange={(e) => setValues((v) => ({ ...v, heroTitleTop: e.target.value }))}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Headline (line 2, accent color)">
+          <input
+            value={values.heroTitleBottom}
+            onChange={(e) => setValues((v) => ({ ...v, heroTitleBottom: e.target.value }))}
+            className={inputClass}
+          />
+        </Field>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-        {items.map((m) => (
-          <div
-            key={m.id}
-            className="group relative aspect-square overflow-hidden rounded-xl border border-border"
-          >
-            <img src={m.url} alt={m.name} className="h-full w-full object-cover" />
-            <div className="absolute inset-x-0 bottom-0 bg-espresso/80 p-2 text-xs text-warm-white opacity-0 transition-opacity group-hover:opacity-100">
-              <div className="truncate">{m.name}</div>
-              <div className="flex items-center justify-between text-warm-white/60">
-                <span>{m.sizeKb ?? 0} KB</span>
-                <button
-                  onClick={() => onDelete(m.id)}
-                  className="hover:text-destructive"
-                  aria-label="Delete"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
+      <Field label="Description">
+        <textarea
+          rows={3}
+          value={values.heroDescription}
+          onChange={(e) => setValues((v) => ({ ...v, heroDescription: e.target.value }))}
+          className={inputClass}
+        />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Primary button label">
+          <input
+            value={values.primaryCtaLabel}
+            onChange={(e) => setValues((v) => ({ ...v, primaryCtaLabel: e.target.value }))}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Secondary button label">
+          <input
+            value={values.secondaryCtaLabel}
+            onChange={(e) => setValues((v) => ({ ...v, secondaryCtaLabel: e.target.value }))}
+            className={inputClass}
+          />
+        </Field>
+      </div>
+
+      <h3 className="pt-2 font-semibold text-foreground">Stats</h3>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {(values.stats ?? DEFAULT_STATS).map((s, i) => (
+          <div key={i} className="space-y-2 rounded-lg border border-border p-3">
+            <input
+              type="number"
+              value={s.value}
+              onChange={(e) => updateStat(i, { value: Number(e.target.value) })}
+              className={inputClass}
+              placeholder="Value"
+            />
+            <input
+              value={s.suffix}
+              onChange={(e) => updateStat(i, { suffix: e.target.value })}
+              className={inputClass}
+              placeholder="Suffix (e.g. + or %)"
+            />
+            <input
+              value={s.label}
+              onChange={(e) => updateStat(i, { label: e.target.value })}
+              className={inputClass}
+              placeholder="Label"
+            />
           </div>
         ))}
       </div>
+
+      <button
+        onClick={() => onSave(values)}
+        disabled={saving}
+        className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+      >
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        Save changes
+      </button>
     </div>
   );
 }
@@ -1977,7 +2762,15 @@ function ContentEditor({
   useEffect(() => {
     setValues(settings);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.phone, settings.email, settings.whatsapp, settings.instagram, settings.linkedin, settings.twitter, settings.address]);
+  }, [
+    settings.phone,
+    settings.email,
+    settings.whatsapp,
+    settings.instagram,
+    settings.linkedin,
+    settings.twitter,
+    settings.address,
+  ]);
 
   const field = (key: keyof SiteSettings, label: string, placeholder: string) => (
     <Field label={label}>

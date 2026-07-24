@@ -329,7 +329,7 @@ export const domains: Domain[] = [
 
 export const getDomain = (slug: string) => domains.find((d) => d.slug === slug);
 
-import { useFirestoreCollection, COLLECTIONS } from "@/lib/firestore";
+import { useFirestoreCollection, fetchCollection, COLLECTIONS } from "@/lib/firestore";
 
 const domainsFallback = domains.map((d) => ({ ...d, id: d.slug }));
 
@@ -340,4 +340,17 @@ export function useDomains() {
 export function useDomain(slug: string) {
   const { data } = useDomains();
   return (data ?? domainsFallback).find((d) => d.slug === slug);
+}
+
+// Used by the route loader (runs before any hook/query cache exists) — checks Firestore
+// first so admin-created domains resolve, falling back to the static seed.
+export async function fetchDomainBySlug(slug: string): Promise<Domain | undefined> {
+  try {
+    const all = await fetchCollection<Domain>(COLLECTIONS.domains);
+    const found = all.find((d) => d.slug === slug);
+    if (found) return found;
+  } catch {
+    // fall through to static seed
+  }
+  return getDomain(slug);
 }

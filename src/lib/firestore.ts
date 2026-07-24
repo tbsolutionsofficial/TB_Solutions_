@@ -1,4 +1,13 @@
-import { collection, doc, addDoc, updateDoc, deleteDoc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  getDoc,
+  getDocs,
+  setDoc,
+} from "firebase/firestore";
 import { useQuery, useQueryClient, useMutation, type UseQueryOptions } from "@tanstack/react-query";
 import { db } from "./firebase";
 
@@ -10,9 +19,30 @@ export const COLLECTIONS = {
   contacts: "contacts",
   media: "media",
   settings: "settings",
+  offers: "offers",
 } as const;
 
 export const SITE_SETTINGS_DOC_ID = "site";
+export const HOME_CONTENT_DOC_ID = "home";
+
+export interface HomeContent {
+  heroEyebrow?: string;
+  heroTitleTop?: string;
+  heroTitleBottom?: string;
+  heroDescription?: string;
+  primaryCtaLabel?: string;
+  secondaryCtaLabel?: string;
+  stats?: { value: number; suffix: string; label: string }[];
+}
+
+export interface Offer {
+  title: string;
+  discount: number;
+  description: string;
+  expiresAt: string;
+  banner?: string;
+  active: boolean;
+}
 
 export interface SiteSettings {
   phone?: string;
@@ -100,9 +130,12 @@ export function useFirestoreCollection<T>(
   });
 }
 
-export async function fetchDoc<T>(name: CollectionName, id: string): Promise<(T & { id: string }) | null> {
+export async function fetchDoc<T>(
+  name: CollectionName,
+  id: string,
+): Promise<(T & { id: string }) | null> {
   const snap = await getDoc(doc(db, name, id));
-  return snap.exists() ? ({ id: snap.id, ...(snap.data() as T) }) : null;
+  return snap.exists() ? { id: snap.id, ...(snap.data() as T) } : null;
 }
 
 // Single-document counterpart to useFirestoreCollection (same initialData/staleness handling).

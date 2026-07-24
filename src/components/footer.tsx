@@ -1,7 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { Mail, Phone, MapPin, Linkedin, Twitter, Instagram, MessageCircle } from "lucide-react";
 import logoAsset from "@/assets/tb-solutions-logo.png";
-import { COLLECTIONS, SITE_SETTINGS_DOC_ID, useFirestoreDoc, type SiteSettings } from "@/lib/firestore";
+import {
+  COLLECTIONS,
+  SITE_SETTINGS_DOC_ID,
+  useFirestoreDoc,
+  type SiteSettings,
+} from "@/lib/firestore";
 
 const DEFAULT_SETTINGS: SiteSettings = {
   email: "hello@tbsolutions.dev",
@@ -36,20 +41,24 @@ export function Footer() {
               software, robotics, IoT, and digital transformation.
             </p>
             <div className="mt-6 flex gap-3">
-              {(socialLinks.length ? socialLinks : [{ href: "#", label: "LinkedIn", icon: Linkedin }, { href: "#", label: "Twitter", icon: Twitter }]).map(
-                (s) => (
-                  <a
-                    key={s.label}
-                    href={s.href}
-                    target={s.href?.startsWith("http") ? "_blank" : undefined}
-                    rel={s.href?.startsWith("http") ? "noreferrer" : undefined}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
-                    aria-label={s.label}
-                  >
-                    <s.icon className="h-5 w-5" />
-                  </a>
-                ),
-              )}
+              {(socialLinks.length
+                ? socialLinks
+                : [
+                    { href: "#", label: "LinkedIn", icon: Linkedin },
+                    { href: "#", label: "Twitter", icon: Twitter },
+                  ]
+              ).map((s) => (
+                <a
+                  key={s.label}
+                  href={s.href}
+                  target={s.href?.startsWith("http") ? "_blank" : undefined}
+                  rel={s.href?.startsWith("http") ? "noreferrer" : undefined}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+                  aria-label={s.label}
+                >
+                  <s.icon className="h-5 w-5" />
+                </a>
+              ))}
             </div>
           </div>
 

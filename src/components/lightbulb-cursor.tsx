@@ -42,8 +42,8 @@ export function LightbulbCursor() {
     variant === "cta"
       ? "0 0 30px 8px color-mix(in oklab, var(--color-copper) 60%, transparent)"
       : variant === "button"
-      ? "0 0 22px 6px color-mix(in oklab, var(--color-copper) 45%, transparent)"
-      : "0 0 14px 3px color-mix(in oklab, var(--color-copper) 30%, transparent)";
+        ? "0 0 22px 6px color-mix(in oklab, var(--color-copper) 45%, transparent)"
+        : "0 0 14px 3px color-mix(in oklab, var(--color-copper) 30%, transparent)";
 
   return (
     <motion.div
@@ -53,12 +53,21 @@ export function LightbulbCursor() {
     >
       <motion.div
         animate={{ scale, y: [0, -2, 0] }}
-        transition={{ scale: { duration: 0.2 }, y: { duration: 2.4, repeat: Infinity, ease: "easeInOut" } }}
+        transition={{
+          scale: { duration: 0.2 },
+          y: { duration: 2.4, repeat: Infinity, ease: "easeInOut" },
+        }}
         style={{ filter: `drop-shadow(${glow})` }}
       >
         <svg width="26" height="30" viewBox="0 0 26 30" fill="none">
           {/* bulb glow halo */}
-          <circle cx="13" cy="12" r="11" fill="url(#bulbGlow)" opacity={variant === "cta" ? 0.9 : 0.6} />
+          <circle
+            cx="13"
+            cy="12"
+            r="11"
+            fill="url(#bulbGlow)"
+            opacity={variant === "cta" ? 0.9 : 0.6}
+          />
           {/* bulb body */}
           <path
             d="M13 2c-4.4 0-8 3.4-8 7.6 0 2.5 1.1 4.7 2.9 6.2.7.6 1.1 1.5 1.1 2.4V19h8v-.8c0-.9.4-1.8 1.1-2.4 1.8-1.5 2.9-3.7 2.9-6.2C21 5.4 17.4 2 13 2z"
@@ -67,7 +76,13 @@ export function LightbulbCursor() {
             strokeWidth="1"
           />
           {/* filament */}
-          <path d="M10 10 L13 7 L16 10" stroke="var(--color-copper-dark)" strokeWidth="1" fill="none" strokeLinecap="round" />
+          <path
+            d="M10 10 L13 7 L16 10"
+            stroke="var(--color-copper-dark)"
+            strokeWidth="1"
+            fill="none"
+            strokeLinecap="round"
+          />
           {/* base */}
           <rect x="8" y="19" width="10" height="2" rx="0.5" fill="var(--color-espresso)" />
           <rect x="9" y="21" width="8" height="2" rx="0.5" fill="var(--color-taupe)" />

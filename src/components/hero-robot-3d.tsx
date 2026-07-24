@@ -26,14 +26,25 @@ function RobotModel() {
     };
   }, [index, names, actions]);
 
-  return <primitive ref={group} object={scene} scale={1.3} position={[0, -0.65, 0]} rotation={[0, 0, 0]} />;
+  return (
+    <primitive
+      ref={group}
+      object={scene}
+      scale={1.3}
+      position={[0, -0.65, 0]}
+      rotation={[0, 0, 0]}
+    />
+  );
 }
 
 useGLTF.preload(MODEL_URL);
 
 // Any WebGL/3D failure (e.g. the browser's per-process WebGL context limit hit when many
 // tabs are open) must never take down the whole page — fall back to the static image.
-class RobotErrorBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { hasError: boolean }> {
+class RobotErrorBoundary extends Component<
+  { fallback: ReactNode; children: ReactNode },
+  { hasError: boolean }
+> {
   state = { hasError: false };
   static getDerivedStateFromError() {
     return { hasError: true };

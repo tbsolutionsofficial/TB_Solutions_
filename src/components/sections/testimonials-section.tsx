@@ -4,12 +4,24 @@ import { Star, Quote, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { testimonials as testimonialsFallback, useTestimonials } from "@/content/testimonials";
 import { createDoc, COLLECTIONS } from "@/lib/firestore";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const fieldClass =
   "w-full rounded-lg border border-border bg-warm-white px-3 py-2 text-sm outline-none focus:border-copper";
 
-function WriteReviewModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function WriteReviewModal({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [values, setValues] = useState({ name: "", company: "", role: "", domain: "", review: "" });
   const [stars, setStars] = useState(5);
   const [submitting, setSubmitting] = useState(false);
@@ -111,7 +123,9 @@ function WriteReviewModal({ open, onOpenChange }: { open: boolean; onOpenChange:
                   aria-label={`${n} stars`}
                   className="p-0.5"
                 >
-                  <Star className={`h-6 w-6 ${n <= stars ? "fill-copper text-copper" : "text-border"}`} />
+                  <Star
+                    className={`h-6 w-6 ${n <= stars ? "fill-copper text-copper" : "text-border"}`}
+                  />
                 </button>
               ))}
             </div>
