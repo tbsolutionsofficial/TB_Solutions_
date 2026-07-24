@@ -1,4 +1,4 @@
-import { collection, doc, addDoc, updateDoc, deleteDoc, getDocs, setDoc } from "firebase/firestore";
+import { collection, doc, addDoc, updateDoc, deleteDoc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { useQuery, useQueryClient, useMutation, type UseQueryOptions } from "@tanstack/react-query";
 import { db } from "./firebase";
 
@@ -9,7 +9,20 @@ export const COLLECTIONS = {
   projects: "projects",
   contacts: "contacts",
   media: "media",
+  settings: "settings",
 } as const;
+
+export const SITE_SETTINGS_DOC_ID = "site";
+
+export interface SiteSettings {
+  phone?: string;
+  email?: string;
+  whatsapp?: string;
+  instagram?: string;
+  linkedin?: string;
+  twitter?: string;
+  address?: string;
+}
 
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 
@@ -70,6 +83,10 @@ export async function upsertDocById(
 
 // Generic read hook. Pass `initialData` (mapped from the static content seed) so first
 // paint and offline/error states fall back to the existing content — never a blank section.
+// initialDataUpdatedAt is forced to 0 (epoch) whenever initialData is given: otherwise
+// React Query treats the fallback as freshly-fetched and skips the real Firestore read
+// for the whole staleTime window, so a fresh page load could show stale/fallback content
+// instead of what's actually in Firestore.
 export function useFirestoreCollection<T>(
   name: CollectionName,
   options?: Partial<UseQueryOptions<(T & { id: string })[]>>,
@@ -77,8 +94,29 @@ export function useFirestoreCollection<T>(
   return useQuery({
     queryKey: ["firestore", name],
     queryFn: () => fetchCollection<T>(name),
-    staleTime: 60_000,
+    staleTime: 20_000,
     ...options,
+    ...(options?.initialData ? { initialDataUpdatedAt: 0 } : {}),
+  });
+}
+
+export async function fetchDoc<T>(name: CollectionName, id: string): Promise<(T & { id: string }) | null> {
+  const snap = await getDoc(doc(db, name, id));
+  return snap.exists() ? ({ id: snap.id, ...(snap.data() as T) }) : null;
+}
+
+// Single-document counterpart to useFirestoreCollection (same initialData/staleness handling).
+export function useFirestoreDoc<T>(
+  name: CollectionName,
+  id: string,
+  options?: Partial<UseQueryOptions<(T & { id: string }) | null>>,
+) {
+  return useQuery({
+    queryKey: ["firestore", name, id],
+    queryFn: () => fetchDoc<T>(name, id),
+    staleTime: 20_000,
+    ...options,
+    ...(options?.initialData !== undefined ? { initialDataUpdatedAt: 0 } : {}),
   });
 }
 

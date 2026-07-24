@@ -7,14 +7,14 @@ import type { ComponentType } from "react";
 interface Props {
   slug: string;
   title: string;
-  short: string;
-  banner: string;
-  items: string[];
+  short?: string;
+  banner?: string;
+  items?: string[];
   Icon: ComponentType<{ className?: string }>;
   index: number;
 }
 
-export function DomainCard({ slug, title, short, banner, items, Icon, index }: Props) {
+export function DomainCard({ slug, title, short = "", banner = "", items = [], Icon, index }: Props) {
   return (
     <motion.div
       data-card
@@ -51,7 +51,9 @@ export function DomainCard({ slug, title, short, banner, items, Icon, index }: P
         params={{ slug }}
         className="absolute inset-0 flex flex-col justify-end overflow-hidden opacity-0 transition-opacity duration-500 group-hover:opacity-100"
       >
-        <img src={banner} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover transition-transform duration-1000 group-hover:scale-100" />
+        {banner && (
+          <img src={banner} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover transition-transform duration-1000 group-hover:scale-100" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-espresso/95 via-espresso/60 to-transparent" />
         {/* particles */}
         {[0, 1, 2, 3, 4].map((i) => (

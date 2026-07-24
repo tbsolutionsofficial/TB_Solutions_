@@ -364,9 +364,13 @@ function Index() {
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((project, index) => (
-              <motion.a
+              <Link
                 key={project.title}
-                href="#contact"
+                to="/projects/$slug"
+                params={{ slug: project.slug }}
+                className="contents"
+              >
+              <motion.div
                 data-card
                 initial={{ opacity: 0, y: 40 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -399,7 +403,8 @@ function Index() {
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </span>
                 </div>
-              </motion.a>
+              </motion.div>
+              </Link>
             ))}
           </div>
         </div>

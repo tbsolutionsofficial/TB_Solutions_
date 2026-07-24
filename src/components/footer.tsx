@@ -1,8 +1,27 @@
 import { Link } from "@tanstack/react-router";
-import { Mail, Phone, MapPin, Linkedin, Twitter } from "lucide-react";
+import { Mail, Phone, MapPin, Linkedin, Twitter, Instagram, MessageCircle } from "lucide-react";
 import logoAsset from "@/assets/tb-solutions-logo.png";
+import { COLLECTIONS, SITE_SETTINGS_DOC_ID, useFirestoreDoc, type SiteSettings } from "@/lib/firestore";
+
+const DEFAULT_SETTINGS: SiteSettings = {
+  email: "hello@tbsolutions.dev",
+  phone: "+1 (555) 000-0000",
+  address: "Global delivery, local presence",
+};
 
 export function Footer() {
+  const { data } = useFirestoreDoc<SiteSettings>(COLLECTIONS.settings, SITE_SETTINGS_DOC_ID, {
+    initialData: null,
+  });
+  const settings = { ...DEFAULT_SETTINGS, ...data };
+
+  const socialLinks = [
+    { href: settings.linkedin, label: "LinkedIn", icon: Linkedin },
+    { href: settings.twitter, label: "Twitter", icon: Twitter },
+    { href: settings.instagram, label: "Instagram", icon: Instagram },
+    { href: settings.whatsapp, label: "WhatsApp", icon: MessageCircle },
+  ].filter((s) => s.href);
+
   return (
     <footer className="border-t border-border bg-cream/50">
       <div className="mx-auto max-w-7xl px-5 py-16 sm:px-6 lg:px-8">
@@ -17,20 +36,20 @@ export function Footer() {
               software, robotics, IoT, and digital transformation.
             </p>
             <div className="mt-6 flex gap-3">
-              <a
-                href="#"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
-                aria-label="LinkedIn"
-              >
-                <Linkedin className="h-5 w-5" />
-              </a>
-              <a
-                href="#"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
-                aria-label="Twitter"
-              >
-                <Twitter className="h-5 w-5" />
-              </a>
+              {(socialLinks.length ? socialLinks : [{ href: "#", label: "LinkedIn", icon: Linkedin }, { href: "#", label: "Twitter", icon: Twitter }]).map(
+                (s) => (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target={s.href?.startsWith("http") ? "_blank" : undefined}
+                    rel={s.href?.startsWith("http") ? "noreferrer" : undefined}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:bg-primary hover:text-primary-foreground"
+                    aria-label={s.label}
+                  >
+                    <s.icon className="h-5 w-5" />
+                  </a>
+                ),
+              )}
             </div>
           </div>
 
@@ -65,15 +84,15 @@ export function Footer() {
               <ul className="mt-4 space-y-3">
                 <li className="flex items-start gap-3 text-muted-foreground">
                   <Mail className="mt-0.5 h-4 w-4 shrink-0 text-copper" />
-                  <span>hello@tbsolutions.dev</span>
+                  <span>{settings.email}</span>
                 </li>
                 <li className="flex items-start gap-3 text-muted-foreground">
                   <Phone className="mt-0.5 h-4 w-4 shrink-0 text-copper" />
-                  <span>+1 (555) 000-0000</span>
+                  <span>{settings.phone}</span>
                 </li>
                 <li className="flex items-start gap-3 text-muted-foreground">
                   <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-copper" />
-                  <span>Global delivery, local presence</span>
+                  <span>{settings.address}</span>
                 </li>
               </ul>
             </div>

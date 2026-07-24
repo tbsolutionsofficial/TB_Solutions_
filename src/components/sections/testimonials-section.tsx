@@ -1,10 +1,159 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Star, Quote, Sparkles } from "lucide-react";
+import { Star, Quote, Sparkles, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { testimonials as testimonialsFallback, useTestimonials } from "@/content/testimonials";
+import { createDoc, COLLECTIONS } from "@/lib/firestore";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+
+const fieldClass =
+  "w-full rounded-lg border border-border bg-warm-white px-3 py-2 text-sm outline-none focus:border-copper";
+
+function WriteReviewModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const [values, setValues] = useState({ name: "", company: "", role: "", domain: "", review: "" });
+  const [stars, setStars] = useState(5);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!values.name.trim() || !values.review.trim()) {
+      toast.error("Please fill in your name and review.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createDoc(COLLECTIONS.reviews, {
+        name: values.name,
+        company: values.company || "—",
+        role: values.role || "—",
+        avatar: `https://i.pravatar.cc/120?u=${encodeURIComponent(values.name)}`,
+        stars,
+        review: values.review,
+        domain: values.domain || "General",
+        date: new Date().toISOString(),
+        status: "pending",
+      });
+      toast.success("Thanks! Your review will appear once approved.");
+      setValues({ name: "", company: "", role: "", domain: "", review: "" });
+      setStars(5);
+      onOpenChange(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg bg-warm-white">
+        <DialogHeader>
+          <DialogTitle className="font-display">Write a review</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Your name
+              </span>
+              <input
+                required
+                value={values.name}
+                onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
+                className={fieldClass}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Company
+              </span>
+              <input
+                value={values.company}
+                onChange={(e) => setValues((v) => ({ ...v, company: e.target.value }))}
+                className={fieldClass}
+              />
+            </label>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Role
+              </span>
+              <input
+                value={values.role}
+                onChange={(e) => setValues((v) => ({ ...v, role: e.target.value }))}
+                className={fieldClass}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Domain worked on
+              </span>
+              <input
+                value={values.domain}
+                onChange={(e) => setValues((v) => ({ ...v, domain: e.target.value }))}
+                placeholder="e.g. Artificial Intelligence"
+                className={fieldClass}
+              />
+            </label>
+          </div>
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Rating
+            </span>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setStars(n)}
+                  aria-label={`${n} stars`}
+                  className="p-0.5"
+                >
+                  <Star className={`h-6 w-6 ${n <= stars ? "fill-copper text-copper" : "text-border"}`} />
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Your review
+            </span>
+            <textarea
+              required
+              rows={4}
+              value={values.review}
+              onChange={(e) => setValues((v) => ({ ...v, review: e.target.value }))}
+              className={fieldClass}
+            />
+          </label>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="rounded-full border border-border px-5 py-2 text-sm font-semibold text-foreground hover:bg-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Submit review
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function TestimonialsSection() {
   const [paused, setPaused] = useState(false);
+  const [writeOpen, setWriteOpen] = useState(false);
   const { data: testimonials = testimonialsFallback } = useTestimonials();
   const approved = testimonials.filter((t) => t.status === "approved");
   const doubled = [...approved, ...approved];
@@ -29,6 +178,12 @@ export function TestimonialsSection() {
           <h2 className="mt-6 font-display text-4xl font-bold text-foreground sm:text-5xl lg:text-6xl">
             Loved by <span className="text-copper-dark">operators.</span>
           </h2>
+          <button
+            onClick={() => setWriteOpen(true)}
+            className="mt-6 inline-flex items-center gap-2 rounded-full border border-border bg-warm-white px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+          >
+            Write a review
+          </button>
         </motion.div>
       </div>
 
@@ -78,6 +233,14 @@ export function TestimonialsSection() {
           ))}
         </motion.div>
       </div>
+
+      {approved.length === 0 && (
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          No reviews yet — be the first to share your experience.
+        </p>
+      )}
+
+      <WriteReviewModal open={writeOpen} onOpenChange={setWriteOpen} />
     </section>
   );
 }

@@ -85,7 +85,7 @@ function DomainPage() {
         <div className="mx-auto max-w-5xl">
           <h2 className="font-display text-3xl font-bold text-foreground">Services we offer</h2>
           <div className="mt-8 grid gap-6 sm:grid-cols-2">
-            {domain.services.map((s) => (
+            {(domain.services ?? []).map((s) => (
               <div key={s.title} data-card className="rounded-3xl glass p-6">
                 <h3 className="font-display text-xl font-bold text-foreground">{s.title}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{s.description}</p>
@@ -95,7 +95,7 @@ function DomainPage() {
 
           <h2 className="mt-16 font-display text-3xl font-bold text-foreground">What's included</h2>
           <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-            {domain.items.map((i) => (
+            {(domain.items ?? []).map((i) => (
               <li key={i} className="flex items-start gap-2 rounded-2xl bg-secondary/50 px-4 py-3">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-copper" />
                 <span className="text-sm text-foreground">{i}</span>
@@ -105,7 +105,7 @@ function DomainPage() {
 
           <h2 className="mt-16 font-display text-3xl font-bold text-foreground">FAQ</h2>
           <div className="mt-6 space-y-4">
-            {domain.faq.map((f) => (
+            {(domain.faq ?? []).map((f) => (
               <details key={f.q} className="group rounded-2xl glass p-5">
                 <summary className="cursor-pointer list-none font-semibold text-foreground">
                   {f.q}

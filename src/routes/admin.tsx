@@ -18,6 +18,9 @@ import {
   Pencil,
   ImagePlus,
   X,
+  Camera,
+  Check,
+  Ban,
 } from "lucide-react";
 import {
   LineChart,
@@ -40,9 +43,12 @@ import { useAdminAuth } from "@/lib/auth";
 import {
   COLLECTIONS,
   useFirestoreCollection,
+  useFirestoreDoc,
   useFirestoreMutations,
   upsertDocById,
+  SITE_SETTINGS_DOC_ID,
   type MediaAsset,
+  type SiteSettings,
 } from "@/lib/firestore";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import {
@@ -141,6 +147,9 @@ function AdminPage() {
   const mediaQuery = useFirestoreCollection<MediaAsset>(COLLECTIONS.media, {
     initialData: mockMedia.map((m) => ({ ...m, id: m.id })),
   });
+  const settingsQuery = useFirestoreDoc<SiteSettings>(COLLECTIONS.settings, SITE_SETTINGS_DOC_ID, {
+    initialData: null,
+  });
 
   const domainsMut = useFirestoreMutations(COLLECTIONS.domains);
   const galleryMut = useFirestoreMutations(COLLECTIONS.gallery);
@@ -148,6 +157,20 @@ function AdminPage() {
   const projectsMut = useFirestoreMutations(COLLECTIONS.projects);
   const contactsMut = useFirestoreMutations(COLLECTIONS.contacts);
   const mediaMut = useFirestoreMutations(COLLECTIONS.media);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const handleSaveSettings = async (data: SiteSettings) => {
+    setSavingSettings(true);
+    try {
+      await upsertDocById(COLLECTIONS.settings, SITE_SETTINGS_DOC_ID, data as Record<string, unknown>);
+      await queryClient.invalidateQueries({ queryKey: ["firestore", COLLECTIONS.settings] });
+      toast.success("Contact settings saved.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save. Check Firestore rules allow writes for this account.");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
   const queryClient = useQueryClient();
 
   const [seeding, setSeeding] = useState(false);
@@ -187,7 +210,7 @@ function AdminPage() {
     name: auth.user?.displayName ?? auth.user?.email?.split("@")[0] ?? mockAdminUser.name,
     email: auth.user?.email ?? mockAdminUser.email,
     role: "Owner",
-    avatar: auth.user?.photoURL ?? mockAdminUser.avatar,
+    avatar: auth.user?.photoURL ?? null,
   };
 
   const domainRows = (domainsQuery.data ?? []).map((d) => ({
@@ -196,13 +219,6 @@ function AdminPage() {
     slug: d.slug,
     order: d.order,
     featured: d.featured ? "yes" : "no",
-  }));
-  const testimonialRows = (testimonialsQuery.data ?? []).map((t) => ({
-    id: t.id,
-    name: t.name,
-    company: t.company,
-    stars: t.stars,
-    status: t.status,
   }));
   const contactRows = (contactsQuery.data ?? []).map((c) => ({
     id: c.id,
@@ -245,7 +261,11 @@ function AdminPage() {
         </nav>
         <div className="border-t border-border p-4">
           <div className="flex items-center gap-3">
-            <img src={adminUser.avatar} alt="" className="h-9 w-9 rounded-full" />
+            <AdminAvatarUpload
+              avatar={adminUser.avatar}
+              name={adminUser.name}
+              onUpload={(url) => auth.updateAvatar(url)}
+            />
             <div className="flex-1 text-sm">
               <div className="font-semibold text-foreground">{adminUser.name}</div>
               <div className="text-xs text-muted-foreground">{adminUser.role}</div>
@@ -308,10 +328,17 @@ function AdminPage() {
               columns={["title", "slug", "order", "featured"]}
               rows={domainRows}
               blankRow={{
-                title: "New",
+                title: "New domain",
                 slug: `new-${Date.now()}`,
                 order: domainRows.length + 1,
                 featured: "no",
+                icon: "Bot",
+                short: "",
+                overview: "",
+                banner: "",
+                items: [],
+                services: [],
+                faq: [],
               }}
               onAdd={(data) => domainsMut.create.mutate(data)}
               onUpdate={(id, patch) => domainsMut.update.mutate({ id, data: patch })}
@@ -322,15 +349,7 @@ function AdminPage() {
             <GalleryAdmin items={galleryQuery.data ?? []} mutations={galleryMut} />
           )}
           {tab === "testimonials" && (
-            <CrudTable
-              title="Testimonials"
-              columns={["name", "company", "stars", "status"]}
-              rows={testimonialRows}
-              blankRow={{ name: "New", company: "New", stars: 5, status: "pending" }}
-              onAdd={(data) => testimonialsMut.create.mutate(data)}
-              onUpdate={(id, patch) => testimonialsMut.update.mutate({ id, data: patch })}
-              onDelete={(id) => testimonialsMut.remove.mutate(id)}
-            />
+            <TestimonialsAdmin testimonials={testimonialsQuery.data ?? []} mutations={testimonialsMut} />
           )}
           {tab === "contacts" && (
             <CrudTable
@@ -365,10 +384,81 @@ function AdminPage() {
               onDelete={(id) => mediaMut.remove.mutate(id)}
             />
           )}
-          {tab === "content" && <ContentEditor />}
+          {tab === "content" && (
+            <ContentEditor
+              settings={settingsQuery.data ?? {}}
+              onSave={handleSaveSettings}
+              saving={savingSettings}
+            />
+          )}
         </div>
       </main>
     </div>
+  );
+}
+
+function AdminAvatarUpload({
+  avatar,
+  name,
+  onUpload,
+}: {
+  avatar: string | null;
+  name: string;
+  onUpload: (url: string) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    try {
+      const result = await uploadToCloudinary(file, "tb-solutions/admin-avatars");
+      onUpload(result.url);
+      toast.success("Profile photo updated");
+    } catch (err) {
+      console.error(err);
+      toast.error("Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const initial = name.trim().charAt(0).toUpperCase() || "A";
+
+  return (
+    <button
+      type="button"
+      onClick={() => fileInputRef.current?.click()}
+      disabled={uploading}
+      className="group relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-secondary"
+      aria-label="Update profile photo"
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleFile(file);
+          e.target.value = "";
+        }}
+      />
+      {avatar ? (
+        <img src={avatar} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center text-sm font-bold text-copper-dark">
+          {initial}
+        </span>
+      )}
+      <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+        {uploading ? (
+          <Loader2 className="h-4 w-4 animate-spin text-white" />
+        ) : (
+          <Camera className="h-4 w-4 text-white" />
+        )}
+      </span>
+    </button>
   );
 }
 
@@ -445,7 +535,11 @@ function monthlySeries(projects: Project[], contacts: Contact[], monthsBack = 6)
   const now = new Date();
   const buckets = Array.from({ length: monthsBack }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1 - i), 1);
-    return { label: d.toLocaleString("en-US", { month: "short" }), year: d.getFullYear(), monthIdx: d.getMonth() };
+    return {
+      label: d.toLocaleString("en-US", { month: "short" }),
+      year: d.getFullYear(),
+      monthIdx: d.getMonth(),
+    };
   });
   const countIn = (dates: (string | undefined)[], year: number, monthIdx: number) =>
     dates.filter((ds) => {
@@ -493,15 +587,19 @@ function DashboardView({
 
   const trend = monthlySeries(projects, contacts);
 
-  const statusCounts = ["published", "draft", "archived"].map((status) => ({
-    name: status,
-    value: projects.filter((p) => p.status === status).length,
-  })).filter((s) => s.value > 0);
+  const statusCounts = ["published", "draft", "archived"]
+    .map((status) => ({
+      name: status,
+      value: projects.filter((p) => p.status === status).length,
+    }))
+    .filter((s) => s.value > 0);
 
-  const ratingCounts = [5, 4, 3, 2, 1].map((stars) => ({
-    name: `${stars} star${stars === 1 ? "" : "s"}`,
-    value: testimonials.filter((t) => t.stars === stars).length,
-  })).filter((r) => r.value > 0);
+  const ratingCounts = [5, 4, 3, 2, 1]
+    .map((stars) => ({
+      name: `${stars} star${stars === 1 ? "" : "s"}`,
+      value: testimonials.filter((t) => t.stars === stars).length,
+    }))
+    .filter((r) => r.value > 0);
 
   const hasNoRealData = projects.length === 0 && contacts.length === 0;
 
@@ -509,7 +607,10 @@ function DashboardView({
     <div className="space-y-6">
       {hasNoRealData && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-secondary/60 p-4 text-sm text-foreground">
-          <span>Firestore has no content yet — the site is showing the built-in starter content as a fallback.</span>
+          <span>
+            Firestore has no content yet — the site is showing the built-in starter content as a
+            fallback.
+          </span>
           <button
             onClick={onSeed}
             disabled={seeding}
@@ -533,7 +634,9 @@ function DashboardView({
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl bg-warm-white p-6 shadow-sm">
-          <h3 className="mb-4 font-semibold text-foreground">Projects delivered (by completion date)</h3>
+          <h3 className="mb-4 font-semibold text-foreground">
+            Projects delivered (by completion date)
+          </h3>
           <ResponsiveContainer width="100%" height={240}>
             <LineChart data={trend}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -551,7 +654,9 @@ function DashboardView({
           </ResponsiveContainer>
         </div>
         <div className="rounded-2xl bg-warm-white p-6 shadow-sm">
-          <h3 className="mb-4 font-semibold text-foreground">Contact inquiries (by submission date)</h3>
+          <h3 className="mb-4 font-semibold text-foreground">
+            Contact inquiries (by submission date)
+          </h3>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={trend}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -622,7 +727,7 @@ function CrudTable({
   title: string;
   columns: string[];
   rows?: Row[];
-  blankRow?: Record<string, string | number>;
+  blankRow?: Record<string, unknown>;
   onAdd?: (data: Record<string, unknown>) => void;
   onUpdate?: (id: string, patch: Record<string, unknown>) => void;
   onDelete?: (id: string) => void;
@@ -757,6 +862,7 @@ interface ProjectFormValues {
   description: string;
   fullDescription: string;
   image: string;
+  images: string[];
   client: string;
   completionDate: string;
   status: "published" | "draft" | "archived";
@@ -777,6 +883,7 @@ function toProjectFormValues(p?: Project): ProjectFormValues {
     description: p?.description ?? "",
     fullDescription: p?.fullDescription ?? "",
     image: p?.image ?? "",
+    images: p?.images ?? [],
     client: p?.client ?? "",
     completionDate: p?.completionDate ?? "",
     status: p?.status ?? "draft",
@@ -786,7 +893,11 @@ function toProjectFormValues(p?: Project): ProjectFormValues {
     tags: (p?.tags ?? []).join(", "),
     github: p?.urls?.github ?? "",
     website: p?.urls?.website ?? p?.urls?.demo ?? "",
-    extraLinks: (p?.urls?.extraLinks ?? []).map((l) => ({ _key: extraLinkKeySeq++, label: l.label, url: l.url })),
+    extraLinks: (p?.urls?.extraLinks ?? []).map((l) => ({
+      _key: extraLinkKeySeq++,
+      label: l.label,
+      url: l.url,
+    })),
   };
 }
 
@@ -814,7 +925,9 @@ function ProjectFormModal({
     if (open) {
       const next = toProjectFormValues(initial);
       setValues(next);
-      setDomainMode(next.domain && !domains.some((d) => d.slug === next.domain) ? "custom" : "select");
+      setDomainMode(
+        next.domain && !domains.some((d) => d.slug === next.domain) ? "custom" : "select",
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initial, open]);
@@ -831,6 +944,25 @@ function ProjectFormModal({
       setUploading(false);
     }
   };
+
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const galleryFileInputRef = useRef<HTMLInputElement>(null);
+  const handleGalleryUpload = async (files: FileList) => {
+    setUploadingGallery(true);
+    try {
+      const uploaded = await Promise.all(
+        Array.from(files).map((file) => uploadToCloudinary(file, "tb-solutions/projects")),
+      );
+      setValues((v) => ({ ...v, images: [...v.images, ...uploaded.map((r) => r.url)] }));
+    } catch (err) {
+      console.error(err);
+      toast.error("Image upload failed.");
+    } finally {
+      setUploadingGallery(false);
+    }
+  };
+  const removeGalleryImage = (url: string) =>
+    setValues((v) => ({ ...v, images: v.images.filter((i) => i !== url) }));
 
   const addExtraLink = () =>
     setValues((v) => ({
@@ -871,7 +1003,7 @@ function ProjectFormModal({
       description: values.description,
       fullDescription: values.fullDescription || values.description,
       image: values.image,
-      images: values.image ? [values.image] : [],
+      images: values.images.length ? values.images : values.image ? [values.image] : [],
       techStack,
       tags,
       client: values.client,
@@ -928,6 +1060,51 @@ function ProjectFormModal({
                   <ImagePlus className="h-4 w-4" />
                 )}
                 {values.image ? "Replace image" : "Upload image"}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Gallery images (shown on the project's full detail page)
+            </span>
+            <div className="flex flex-wrap gap-3">
+              {values.images.map((url) => (
+                <div key={url} className="group relative h-16 w-16 overflow-hidden rounded-lg">
+                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeGalleryImage(url)}
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                    aria-label="Remove image"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              <input
+                ref={galleryFileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.length) void handleGalleryUpload(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => galleryFileInputRef.current?.click()}
+                disabled={uploadingGallery}
+                className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground hover:bg-secondary disabled:opacity-60"
+                aria-label="Add gallery images"
+              >
+                {uploadingGallery ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="h-4 w-4" />
+                )}
               </button>
             </div>
           </div>
@@ -1615,6 +1792,92 @@ function GalleryAdmin({
   );
 }
 
+function TestimonialsAdmin({
+  testimonials,
+  mutations,
+}: {
+  testimonials: Testimonial[];
+  mutations: ReturnType<typeof useFirestoreMutations>;
+}) {
+  const [q, setQ] = useState("");
+  const filtered = testimonials.filter(
+    (t) => t.name.toLowerCase().includes(q.toLowerCase()) || t.company.toLowerCase().includes(q.toLowerCase()),
+  );
+
+  const setStatus = (id: string, status: Testimonial["status"]) =>
+    mutations.update.mutate({ id, data: { status } }, { onSuccess: () => toast.success(`Marked ${status}`) });
+
+  const statusBadge = (status: Testimonial["status"]) => {
+    const styles =
+      status === "approved"
+        ? "bg-secondary text-copper-dark"
+        : status === "rejected"
+          ? "bg-destructive/10 text-destructive"
+          : "bg-amber-500/10 text-amber-700";
+    return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles}`}>{status}</span>;
+  };
+
+  return (
+    <div className="rounded-2xl bg-warm-white p-6 shadow-sm">
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Search reviews…"
+        className="mb-4 w-full max-w-sm rounded-lg border border-border bg-warm-white px-3 py-2 text-sm outline-none focus:border-copper"
+      />
+      <div className="space-y-3">
+        {filtered.map((t) => (
+          <div key={t.id} className="rounded-xl border border-border p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <img src={t.avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                <div>
+                  <div className="font-semibold text-foreground">
+                    {t.name} {statusBadge(t.status)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {t.role} · {t.company} · {t.domain} · {t.stars}★
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {t.status !== "approved" && (
+                  <button
+                    onClick={() => setStatus(t.id, "approved")}
+                    className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+                  >
+                    <Check className="h-3.5 w-3.5" /> Approve
+                  </button>
+                )}
+                {t.status !== "rejected" && (
+                  <button
+                    onClick={() => setStatus(t.id, "rejected")}
+                    className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
+                  >
+                    <Ban className="h-3.5 w-3.5" /> Reject
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    mutations.remove.mutate(t.id);
+                    toast.success("Deleted");
+                  }}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  aria-label="Delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">"{t.review}"</p>
+          </div>
+        ))}
+        {filtered.length === 0 && <p className="py-8 text-center text-muted-foreground">No reviews</p>}
+      </div>
+    </div>
+  );
+}
+
 function MediaGrid({
   items,
   onUpload,
@@ -1700,37 +1963,58 @@ function MediaGrid({
   );
 }
 
-function ContentEditor() {
-  const [hero, setHero] = useState("Every domain. One partner.");
+function ContentEditor({
+  settings,
+  onSave,
+  saving,
+}: {
+  settings: SiteSettings;
+  onSave: (data: SiteSettings) => void;
+  saving: boolean;
+}) {
+  const [values, setValues] = useState<SiteSettings>(settings);
+
+  useEffect(() => {
+    setValues(settings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.phone, settings.email, settings.whatsapp, settings.instagram, settings.linkedin, settings.twitter, settings.address]);
+
+  const field = (key: keyof SiteSettings, label: string, placeholder: string) => (
+    <Field label={label}>
+      <input
+        value={values[key] ?? ""}
+        onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+        placeholder={placeholder}
+        className={inputClass}
+      />
+    </Field>
+  );
+
   return (
     <div className="max-w-3xl space-y-4 rounded-2xl bg-warm-white p-6 shadow-sm">
-      <div>
-        <label className="mb-2 block text-sm font-semibold text-foreground">Hero headline</label>
-        <input
-          value={hero}
-          onChange={(e) => setHero(e.target.value)}
-          className="w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-copper"
-        />
+      <p className="text-sm text-muted-foreground">
+        These power the footer contact details and social links on the public site. Leave a field
+        blank to hide it.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {field("email", "Contact email", "hello@tbsolutions.dev")}
+        {field("phone", "Phone number", "+1 (555) 000-0000")}
       </div>
-      <div>
-        <label className="mb-2 block text-sm font-semibold text-foreground">Hero description</label>
-        <textarea
-          rows={4}
-          defaultValue="TB_Solutions is your project consultancy partner…"
-          className="w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-copper"
-        />
+      {field("address", "Address", "Global delivery, local presence")}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {field("whatsapp", "WhatsApp link", "https://wa.me/15550000000")}
+        {field("instagram", "Instagram link", "https://instagram.com/tbsolutions")}
       </div>
-      <div>
-        <label className="mb-2 block text-sm font-semibold text-foreground">Contact email</label>
-        <input
-          defaultValue="hello@tbsolutions.dev"
-          className="w-full rounded-lg border border-border px-3 py-2 outline-none focus:border-copper"
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        {field("linkedin", "LinkedIn link", "https://linkedin.com/company/tbsolutions")}
+        {field("twitter", "Twitter / X link", "https://x.com/tbsolutions")}
       </div>
       <button
-        onClick={() => toast.success("Content saved (mock)")}
-        className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
+        onClick={() => onSave(values)}
+        disabled={saving}
+        className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
       >
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         Save changes
       </button>
     </div>

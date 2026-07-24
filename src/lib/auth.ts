@@ -3,6 +3,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
+  updateProfile,
   type User,
 } from "firebase/auth";
 import { auth } from "./firebase";
@@ -27,6 +28,11 @@ export function useAdminAuth() {
   const signIn = (email: string, password: string) =>
     signInWithEmailAndPassword(auth, email, password);
   const signOut = () => firebaseSignOut(auth);
+  const updateAvatar = async (photoURL: string) => {
+    if (!auth.currentUser) return;
+    await updateProfile(auth.currentUser, { photoURL });
+    setState((s) => ({ ...s }));
+  };
 
-  return { ...state, signIn, signOut };
+  return { ...state, signIn, signOut, updateAvatar };
 }

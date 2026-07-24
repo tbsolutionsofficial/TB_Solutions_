@@ -8,8 +8,8 @@ export function LightbulbCursor() {
   const [variant, setVariant] = useState<Variant>("default");
   const x = useMotionValue(-200);
   const y = useMotionValue(-200);
-  const sx = useSpring(x, { stiffness: 350, damping: 30, mass: 0.5 });
-  const sy = useSpring(y, { stiffness: 350, damping: 30, mass: 0.5 });
+  const sx = useSpring(x, { stiffness: 1200, damping: 60, mass: 0.25 });
+  const sy = useSpring(y, { stiffness: 1200, damping: 60, mass: 0.25 });
 
   useEffect(() => {
     if (typeof window === "undefined") return;

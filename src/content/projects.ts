@@ -188,6 +188,15 @@ export const projects: Project[] = [
 
 import { useFirestoreCollection, COLLECTIONS } from "@/lib/firestore";
 
+const projectsFallback = projects.map((p) => ({ ...p, id: p.id }));
+
 export function useProjects() {
-  return useFirestoreCollection<Project>(COLLECTIONS.projects, { initialData: projects });
+  return useFirestoreCollection<Project>(COLLECTIONS.projects, { initialData: projectsFallback });
+}
+
+export const getProject = (slug: string) => projects.find((p) => p.slug === slug);
+
+export function useProject(slug: string) {
+  const { data } = useProjects();
+  return (data ?? projectsFallback).find((p) => p.slug === slug);
 }
